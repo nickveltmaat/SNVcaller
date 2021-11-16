@@ -1,28 +1,51 @@
 import sys
-
+import subprocess
 if len(sys.argv) != 3:
-	print("Usage:\t" + sys.argv[0] + "\t<input_sinvict_file_path>\t<output_filename>")
-	exit(0)
-
-variants = {}
-with open(sys.argv[1]) as infile:
-	for line in infile:
-		line = line.rstrip()
-		tokens = line.split()
-
-		chromosome = tokens[0]
-		position = tokens[1]
-		ref = tokens[3]
-		alt = tokens[5]
-
-		key = chromosome + ":" + position
-		if key not in variants:
-			variants[key] = ref + "\t" + alt
-
+  print("Usage:\t" + sys.argv[0] + "\t<input_sinvict_file_path>\t<output_filename>")
+  exit(0)
+  
+  
 outfile = open(sys.argv[2], "w")
 outfile.write("##fileformat=VCFv4.3\n")
+
+chroms = []
+with open(sys.argv[1]) as infile:
+  for line in infile:
+    line = line.rstrip()
+    tokens = line.split()
+    chromosome = tokens[0]
+    chroms.append(chromosome)
+
+chroms2 = set(chroms)    
+for i in chroms2:
+    outfile.write("##contig=<ID="+str(i)+">\n")
+
+
 outfile.write("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
 
-for key, value in variants.items():
-	key_tokens = key.split(':')
-	outfile.write(key_tokens[0] + "\t" + key_tokens[1] + "\t" + "." + "\t" + value + "\t" + "." + "\t" + "PASS" + "\t" + "." + "\n")
+with open(sys.argv[1]) as infile:
+  for line in infile:
+    line = line.rstrip()
+    tokens = line.split()
+    chromosome = tokens[0]
+    position = tokens[1]
+    ref = tokens[3]
+    alt = tokens[5]
+    if alt[0] == "+" :
+      #insertion
+      alt = ref + alt[1:]
+      outfile.write(chromosome + "\t" + str(position) + "\t" + "." + "\t" + ref.upper() + "\t" + alt.upper() + "\t" + "." + "\t" + "PASS" + "\t" + "." + "\n")
+    elif alt[0] == "-" :
+      #deletion
+      position = int(position)
+      position -= 1
+      fa = subprocess.check_output(["samtools", "faidx", "../hg19.fa", chromosome+":"+str(position)+"-"+str(position)])
+      base = fa.split("\n".encode())[1]
+      base.rstrip()
+      ref = base + str(alt[1:]).encode()
+      alt = base
+      outfile.write(chromosome + "\t" + str(position) + "\t" + "." + "\t" + ref.decode("utf-8").upper() + "\t" + alt.decode("utf-8").upper() + "\t" + "." + "\t" + "PASS" + "\t" + "." + "\n")
+    else: 
+      outfile.write(chromosome + "\t" + str(position) + "\t" + "." + "\t" + ref.upper() + "\t" + alt.upper() + "\t" + "." + "\t" + "PASS" + "\t" + "." + "\n")
+      
+#original copied at 19okt2021 from: https://raw.githubusercontent.com/sfu-compbio/sinvict/master/sinvict_to_vcf.py
