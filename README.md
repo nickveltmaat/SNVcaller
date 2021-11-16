@@ -26,42 +26,44 @@ The general workflow in the pipeline is as follows:
 ## Installation
 **1. Clone the repo**
 
-> `git clone https://github.com/nickveltmaat/SNVcaller`
+`git clone https://github.com/nickveltmaat/SNVcaller`
 
 **2. Set working directory to the repo**
 
-> `cd /path/to/SNVCaller`
+`cd /path/to/SNVCaller`
 
 **3. Create python virtual environment (env)**
 
-> `python3 -m venv ./env`
+`python3 -m venv ./env`
 
 **4. Install needed packages in env with pip3**
 
-> `source ./env/bin/activate`
-
-> `pip3 install numpy`
-
-> `pip3 install pandas`
-
-> `pip3 install venn`
-
-> `pip3 install matplotlib`
-
-> `pip3 install pandas_bokeh`
-
-> `pip3 install glob`
-
-> `deactivate`
-
-
+```
+source ./env/bin/activate
+pip3 install numpy
+pip3 install pandas
+pip3 install venn
+pip3 install matplotlib
+pip3 install pandas_bokeh
+pip3 install glob
+deactivate
+```
 **5. [Download](https://drive.google.com/drive/folders/1QBt0NdPqjQU_y-A7omxoyiPfl1DL65Xn?usp=sharing) and copy the pre-built tools to `/path/to/SNVCaller/` and unzip**
-> `unzip ./tools.zip`
->
+ 
+ `unzip ./tools.zip`
 
 ## Usage
 Once all tools and pre-requisites are installed correctly, the pipeline can be called with: 
 
-`bash ./SNVcaller.sh -I /path/to/.bam -R /path/to/reference.fa -L /path/to/List_of_regions_panel.bed -V $minVAF [0-1] -D $minDepth [int] -C $minCallsByTools [1-4]`
+`bash ./SNVcaller.sh ARGUMENTS`
 
-Output can be found in `/path/to/SNVcaller/output/name_of_.bam_file/`
+**Required** arguments:
+- `-I` Input:              **String**   --> example: `/path/to/input.bam`
+- `-R` Reference:          **String**    --> example: `/path/to/reference.fa`
+- `-L` Regions List:       **String**    --> example: `/path/to/panel.bed`
+- `-D` minimum Read Depth:  **Int**       --> example: `100`
+- `-V` minimum VAF:         __float *[0-1]*__  --> example: `0.002`
+- `-C` minimum Calls:       __Int *[1-4]*__ --> example: `2`
+
+
+Output will be generated in `/path/to/SNVcaller/output/name_of_.bam_file/`
