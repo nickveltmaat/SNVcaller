@@ -4,9 +4,13 @@
 # Stringdoc alle scriptjes
 # Leesbaar maken
 
-Inputbam=/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/GenomeScan_SequenceData/103584-001-018-006.bam
+Inputbam=/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/GenomeScan_SequenceData/
 Listregions="/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/2020_covered_probe_notranslocation.bed"
 Reference="/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/hg19.fa"
+VAF=0.002
+RDP=100
+Calls=1
+
 
 cd /groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/SNVcallingPipeline/
 
@@ -60,34 +64,34 @@ run_tools() {
      -o ./temp/LF/output_lofreq_bed.vcf \
      -l ./temp/newbed.bed \
      ./temp/newbam.bam && \
-     
+  #Filter Lofreq     
   ./tools/lofreq/src/lofreq/lofreq filter \
     -i ./temp/LF/output_lofreq_bed.vcf \
       -o ./temp/LF/LF.vcf \
-      -v 100 \
-      -a 0.002 & \
+      -v $RDP \
+      -a $VAF & \
       
   #Mutect2
   gatk Mutect2 \
     --verbosity ERROR \
-    --callable-depth 100 \
-    --minimum-allele-fraction 0.002 \
+    --callable-depth $RDP \
+    --minimum-allele-fraction $VAF \
     -R $Reference \
     -I ./temp/newbam.bam \
     -O ./temp/M2/M2Unfiltered.vcf \
     --native-pair-hmm-threads 8 \
     -L ./temp/newbed.bed && \
-    
+  #Filter Mutect2    
   gatk FilterMutectCalls \
     --verbosity ERROR \
-    --min-allele-fraction 0.002 \
+    --min-allele-fraction $VAF \
     -R $Reference \
     -V ./temp/M2/M2Unfiltered.vcf \
     -O ./temp/M2/M2.vcf & \
     
   #VarDict
   ~/.conda/pkgs/vardict-java-1.8.2-hdfd78af_3/bin/vardict-java \
-    -f 0.002 \
+    -f $VAF \
     -th 8 \
     -G $Reference \
     -b ./temp/newbam.bam \
@@ -102,8 +106,8 @@ run_tools() {
     ./temp/newbam.bam > ./temp/output-readcount/output.readcount && \
     
     ./tools/sinvict/sinvict \
-    -m 100 \
-    -f 0.002 \
+    -m $RDP \
+    -f $VAF \
     -t ./temp/output-readcount/ \
     -o ./temp/output-sinvict/ & \
   wait
@@ -149,14 +153,12 @@ if [[ -d $Inputbam ]]; then
       bcftools isec \
           -p ./output/${xpref} \
           -O v \
-          -n +1 \
+          -n +$Calls \
           ./temp/SV/SV-decomposed-normalized.vcf.gz \
           ./temp/M2/M2-decomposed-normalized.vcf.gz \
           ./temp/LF/LF-decomposed-normalized.vcf.gz \
           ./temp/VD/VD-decomposed-normalized.vcf.gz  
-      source ./env/bin/activate
-      python ./create_plots.py ${xpref}
-      deactivate
+      pythonscript ./create_plots.py ${xpref}
       rm -rf ./temp  
     done
     
@@ -173,14 +175,15 @@ elif [[ -f $Inputbam ]]; then
     bcftools isec \
         -p ./output/${xpref} \
         -O v \
-        -n +1 \
+        -n +$Calls \
         ./temp/SV/SV-decomposed-normalized.vcf.gz \
         ./temp/M2/M2-decomposed-normalized.vcf.gz \
         ./temp/LF/LF-decomposed-normalized.vcf.gz \
         ./temp/VD/VD-decomposed-normalized.vcf.gz
     pythonscript ./create_plots.py ${xpref}
-    #rm -rf ./temp
+    rm -rf ./temp
 
+#Else (error)
 else
     echo "$Inputbam is not valid"
     exit 1
