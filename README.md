@@ -54,6 +54,12 @@ The general workflow in the pipeline is as follows:
 
 > `deactivate`
 
-**5. Download and copy the pre-built tools to `/path/to/SNVCaller/` and unzip**
+**5. [Download](https://drive.google.com/drive/folders/1QBt0NdPqjQU_y-A7omxoyiPfl1DL65Xn?usp=sharing) and copy the pre-built tools to `/path/to/SNVCaller/` and unzip**
 > `unzip ./tools.zip`
 
+## Usage
+Once all tools and pre-requisites are installed correctly, the pipeline can be called with: 
+
+`bash ./SNVcaller.sh -I /path/to/.bam/ -R /path/to/reference.fa -L /path/to/List_of_regions_panel.bed`
+
+Output can be found in `/path/to/SNVcaller/output/name_of_.bam_file/`
