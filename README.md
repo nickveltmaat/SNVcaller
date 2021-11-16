@@ -54,8 +54,10 @@ The general workflow in the pipeline is as follows:
 
 > `deactivate`
 
+
 **5. [Download](https://drive.google.com/drive/folders/1QBt0NdPqjQU_y-A7omxoyiPfl1DL65Xn?usp=sharing) and copy the pre-built tools to `/path/to/SNVCaller/` and unzip**
 > `unzip ./tools.zip`
+>
 
 ## Usage
 Once all tools and pre-requisites are installed correctly, the pipeline can be called with: 
