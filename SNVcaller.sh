@@ -130,7 +130,7 @@ run_tools() {
   ## Processing SiNVICT
   echo -e '\n\n\nProcessing SiNVICT data: \n\n'
   Rscript ./sort_sinvict.R
-  pythonscript ./sinvict_to_vcf2.py ./temp/output-sinvict/calls_level1_sorted.sinvict ./temp/SV/SV.vcf
+  pythonscript ./sinvict_to_vcf.py ./temp/output-sinvict/calls_level1_sorted.sinvict ./temp/SV/SV.vcf
   postprocess_vcf "SV"
   
   ### Comparing Mutation call overlaps
