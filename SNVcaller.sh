@@ -1,16 +1,17 @@
 #TODO:
-# source bash voor parameters
-# decompose, normalize, bgzip, index in functie zetten
 # Stringdoc alle scriptjes
-# Leesbaar maken
 
-Inputbam=/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/GenomeScan_SequenceData/
-Listregions="/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/2020_covered_probe_notranslocation.bed"
-Reference="/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/hg19.fa"
-VAF=0.002
-RDP=100
-Calls=1
-
+while getopts "R:L:I:O:V:D:C:" arg; do
+  case $arg in
+    R) Reference=$OPTARG;;
+    L) Listregions=$OPTARG;;
+    I) Inputbam=$OPTARG;;
+    O) Outputdir=$OPTARG;;
+    V) VAF=$OPTARG;;
+    D) RDP=$OPTARG;;
+    C) Calls=$OPTARG;;
+  esac
+done
 
 cd /groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/SNVcallingPipeline/
 
@@ -129,7 +130,7 @@ run_tools() {
   ## Processing SiNVICT
   echo -e '\n\n\nProcessing SiNVICT data: \n\n'
   Rscript ./sort_sinvict.R
-  pythonscript ./sinvict_to_vcf.py ./temp/output-sinvict/calls_level1_sorted.sinvict ./temp/SV/SV.vcf
+  pythonscript ./sinvict_to_vcf2.py ./temp/output-sinvict/calls_level1_sorted.sinvict ./temp/SV/SV.vcf
   postprocess_vcf "SV"
   
   ### Comparing Mutation call overlaps
@@ -190,3 +191,4 @@ else
 fi
 
 echo -e '\nFinished! \n'
+
