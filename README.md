@@ -10,7 +10,7 @@
  * HTSlib > [1.11](http://www.htslib.org/download/)
  * Python > [3.9](https://www.python.org/downloads/release/python-390/)
  * R > [4.0](https://cran.r-project.org/bin/windows/base/)
- * *LoFreq, vt (for post-processing), a python venv and SiNVICT with its prerequisites are pre-installed, more info on this in* [__'Installation'__](https://github.com/nickveltmaat/SNVcaller/blob/main/README.md#installation)
+ * *LoFreq, [vt](https://github.com/atks/vt) (for post-processing), and SiNVICT with its prerequisites are pre-built, more info on this in* [__'Installation'__](https://github.com/nickveltmaat/SNVcaller/blob/main/README.md#installation)
 
 ## General Description
 This is a pipeline made to reliably generate calls for somatic mutations in Low Variant Allele Frequencies (VAF) samples in specific regions, such as NGS data from cfDNA. This is done by analyzing `.BAM` files with 4 different tools (`VarDict`, `LoFreq`, `Mutect2` & `SiNVICT`). The pipeline will output variants that are called with at least an `x` amount of tools (this can be set from 1-4). Of course, the higher the number, the lower False Positive call rate, the higher the reliability of the call, but also the higher the chance you'll miss relevant somatic variants. 
@@ -24,3 +24,36 @@ The general workflow in the pipeline is as follows:
 
 
 ## Installation
+**1. Clone the repo**
+
+> `git clone https://github.com/nickveltmaat/SNVcaller`
+
+**2. Set working directory to the repo**
+
+> `cd /path/to/SNVCaller`
+
+**3. Create python virtual environment (env)**
+
+> `python3 -m venv ./env`
+
+**4. Install needed packages in env with pip3**
+
+> `source ./env/bin/activate`
+
+> `pip3 install numpy`
+
+> `pip3 install pandas`
+
+> `pip3 install venn`
+
+> `pip3 install matplotlib`
+
+> `pip3 install pandas_bokeh`
+
+> `pip3 install glob`
+
+> `deactivate`
+
+**5. Download and copy the pre-built tools to `/path/to/SNVCaller/` and unzip**
+> `unzip ./tools.zip`
+
