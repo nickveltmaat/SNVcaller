@@ -2,7 +2,7 @@
 #### **Pipeline to call SNV's with 4 tools (`VarDict`, `LoFreq`, `Mutect2` & `SiNVICT`)**
 
 ### Prerequisites:
- * A process-ready BAM file (or folder containing them), e.g. pre-processed following [GATK best practices workflows; Data pre-processing for variant discovery](https://gatk.broadinstitute.org/hc/en-us/articles/360035535912-Data-pre-processing-for-variant-discovery)
+ * A process-ready BAM file (or folder containing them), e.g. pre-processed following [GATK best practices](https://gatk.broadinstitute.org/hc/en-us/articles/360035535912-Data-pre-processing-for-variant-discovery)
  * [GATK](https://gatk.broadinstitute.org/hc/en-us) > [4.1.4.1](https://github.com/broadinstitute/gatk/releases/tag/4.1.4.1)
  * [Vardict Java](https://bioconda.github.io/recipes/vardict-java/README.html) > 1.8.2
  * [SAMtools](http://www.htslib.org/) > [1.9](http://www.htslib.org/download/)
@@ -19,7 +19,7 @@ The general workflow in the pipeline is as follows:
 
 `.BAM` and `.bed` files are copied to a temporary folder, where the processing happens. Ather that, the 4 tools will run in parralel, generating preliminary results which are also stored in the temporary folder. Since `VarDict` and `SiNVICT` don't output regular `.vcf` files, this data first needs to be processed in order to compare the overlapping variants in the `.vcf` files. This processing consists of sorting variants and generating `.vcf` files, which is done with custom Python and R scripts. Then, all `.vcf` files are [decomposed](https://genome.sph.umich.edu/wiki/Vt#Decompose), [normalized](https://genome.sph.umich.edu/wiki/Vt#Normalization), gunzipped and indexed. Finally, with all `.vcf` files processed, the variants can be compared on overlapping variants. All variants called with `x` or more tools will be saved. Also a venn diagram of mutation calls per tool is generated, together with histograms of amount of mutations with a certain VAF & Read Depth. VAF & Read Depth are calculated with the data from `VarDict`, `LoFreq`, `Mutect2`, since `SiNVICT` doensn't output this data. 
 
-*n.b.: A single `.bam` file or a directory containing `.bam` files can be given as arguments. When a directory is given, the process above will loop over all files, generating output folders for each `.bam` file* 
+*n.b. : A single `.bam` file or a directory containing `.bam` files can be given as arguments. When a directory is given, the process above will loop over all files, generating output folders for each `.bam` file* 
 
 
 
@@ -62,6 +62,6 @@ The general workflow in the pipeline is as follows:
 ## Usage
 Once all tools and pre-requisites are installed correctly, the pipeline can be called with: 
 
-`bash ./SNVcaller.sh -I /path/to/.bam/ -R /path/to/reference.fa -L /path/to/List_of_regions_panel.bed`
+`bash ./SNVcaller.sh -I /path/to/.bam -R /path/to/reference.fa -L /path/to/List_of_regions_panel.bed -V $minVAF [0-1] -D $minDepth [int] -C $minCallsByTools [1-4]`
 
 Output can be found in `/path/to/SNVcaller/output/name_of_.bam_file/`
