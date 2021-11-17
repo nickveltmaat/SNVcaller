@@ -1,5 +1,5 @@
 # SNVcaller
-#### **Pipeline to call SNV's with 4 tools (`VarDict`, `LoFreq`, `Mutect2` & `SiNVICT`)**
+#### **Pipeline to call SNV's with 4 tools ([`VarDict`](https://pubmed.ncbi.nlm.nih.gov/27060149/), [`LoFreq`](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3526318/), [`Mutect2`](https://www.biorxiv.org/content/10.1101/861054v1) & [`SiNVICT`](https://pubmed.ncbi.nlm.nih.gov/27531099/))**
 
 ### Prerequisites:
  * A process-ready BAM file (or folder containing them), e.g. pre-processed following [GATK best practices](https://gatk.broadinstitute.org/hc/en-us/articles/360035535912-Data-pre-processing-for-variant-discovery)
