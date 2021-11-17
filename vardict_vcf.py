@@ -1,3 +1,10 @@
+"""
+This module automatically converts sorted vardict output to standard .vcf format.
+
+Author: Nick Veltmaat
+Date: 17-11-2021
+"""
+
 import pandas as pd
 import glob
 
@@ -69,9 +76,9 @@ file1.write('''##INFO=<ID=5pFS,Number=1,Type=Flag,Description="20bp flanking the
 file1.write('''##INFO=<ID=3pFS,Number=1,Type=Flag,Description="20bp flanking the variants at 3’">\n''')
 file1.write('''##INFO=<ID=Seg,Number=1,Type=Float,Description="The genomic segment variant is called">\n''')
 file1.write('''##INFO=<ID=VarType,Number=1,Type=Flag,Description="The type of variants. Values are: SNV, MNV, Insertion, Deletion, and Complex">\n''')
+
 for i in df['#CHROM'].unique():
     file1.write("##contig=<ID="+str(i)+">\n")
 # file1.write(df.to_string(index = False, justify='left', colsp))
-file1.write(df.to_csv(index = False, sep='\t'))
-        
+file1.write(df.to_csv(index = False, sep='\t'))      
 file1.close()
