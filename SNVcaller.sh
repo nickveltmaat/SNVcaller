@@ -45,8 +45,7 @@ pythonscript() {
 run_tools() {
   # Creating temp dirs
   mkdir ./temp && mkdir ./temp/M2 && mkdir ./temp/VD && mkdir ./temp/LF && mkdir ./temp/SV
-  mkdir ./temp/output-readcount && mkdir ./temp/output-sinvict
-  
+  mkdir ./temp/output-readcount && mkdir ./temp/output-sinvict  
   echo -e '\nPre-process bam and bed file: \n\n'
   ## Preprocessing .bam and .bed (removing 'chr')
   samtools view -H $1 | sed 's/xxxxx//g' > ./temp/header.sam
@@ -138,51 +137,36 @@ run_tools() {
   echo -e '\nData processed with all 4 tools\n\n'
 }
 
+process_bam() {
+  a=$1
+  xbase=${a##*/}
+  xpref=${xbase%.*}
+  echo sample= ${xpref}
+  mkdir ./output/${xpref}  
+  run_tools $a
+  echo -e '\nComparing SNV Tools: \n'
+  bcftools isec \
+    -p ./output/${xpref} \
+    -O v \
+    -n +$Calls \
+    ./temp/SV/SV-decomposed-normalized.vcf.gz \
+    ./temp/M2/M2-decomposed-normalized.vcf.gz \
+    ./temp/LF/LF-decomposed-normalized.vcf.gz \
+    ./temp/VD/VD-decomposed-normalized.vcf.gz  
+  pythonscript ./create_plots.py ${xpref}
+  rm -rf ./temp  
+}
 
 #Directory:
 if [[ -d $Inputbam ]]; then
     for entry in "$Inputbam"/*.bam
     do
-      a=$entry
-      xbase=${a##*/}
-      xpref=${xbase%.*}
-      echo 
-      echo sample= ${xpref}
-      mkdir ./output/${xpref}  
-      run_tools $entry
-      echo -e '\nComparing SNV Tools: \n'
-      bcftools isec \
-          -p ./output/${xpref} \
-          -O v \
-          -n +$Calls \
-          ./temp/SV/SV-decomposed-normalized.vcf.gz \
-          ./temp/M2/M2-decomposed-normalized.vcf.gz \
-          ./temp/LF/LF-decomposed-normalized.vcf.gz \
-          ./temp/VD/VD-decomposed-normalized.vcf.gz  
-      pythonscript ./create_plots.py ${xpref}
-      rm -rf ./temp  
+      process_bam $entry
     done
     
 #One-File:     
 elif [[ -f $Inputbam ]]; then
-    a=$Inputbam
-    xbase=${a##*/}
-    xpref=${xbase%.*}
-    echo sample= ${xpref}
-    mkdir ./output/${xpref}
-      
-    run_tools $Inputbam
-    echo -e '\nComparing SNV Tools: \n'
-    bcftools isec \
-        -p ./output/${xpref} \
-        -O v \
-        -n +$Calls \
-        ./temp/SV/SV-decomposed-normalized.vcf.gz \
-        ./temp/M2/M2-decomposed-normalized.vcf.gz \
-        ./temp/LF/LF-decomposed-normalized.vcf.gz \
-        ./temp/VD/VD-decomposed-normalized.vcf.gz
-    pythonscript ./create_plots.py ${xpref}
-    rm -rf ./temp
+    process_bam $Inputbam
 
 #Else (error)
 else
