@@ -1,4 +1,6 @@
-# Sorting .sinvict file by Chr and Pos
+# This script automatically sorts Sinvict output file by Chr and Pos
+# Author: Nick Veltmaat
+# Date: 17-11-2021
 
 df <- read.table(file = './temp/output-sinvict/calls_level1.sinvict', sep = '\t', header = F)
 
