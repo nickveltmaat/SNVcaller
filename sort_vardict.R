@@ -1,5 +1,7 @@
-# Sorting .sinvict file by Chr and Pos
-print(getwd())
+# This script automatically sorts Vardict output file by Chr and Pos
+# Author: Nick Veltmaat
+# Date: 17-11-2021
+
 df <- read.table(file = './temp/VD/vardict_raw.vcf', sep = '\t', header = F)
 
 #Adding 'chr'
