@@ -1,3 +1,13 @@
+"""
+This module loads 'sites.txt' from a specific sample in the output folder,
+Generates a Venn diagram of amount of mutations called per tool,
+Generates Histogram of amount of mutations with a certain Read Depth
+Generates Histogram of amount of mutations with a certain VAF (Variant Allele Frequency)
+
+Author: Nick Veltmaat
+Date: 17-11-2021
+"""
+
 import io
 import os
 import re
@@ -57,6 +67,13 @@ len(df)
 
 ## Histograms
 def read_vcf(path):
+"""
+This function reads a .vcf file and stores it as a df.
+
+Required Argument: path to .vcf file
+
+Returns: Dataframe
+"""
     with open(path, 'r') as f:
         lines = [l for l in f if not l.startswith('##')]
     return pd.read_csv(
@@ -94,6 +111,13 @@ df_merged["DP_mean"] = df_merged[["DP", "DP_x", "DP_y"]].mean(axis=1).round()
 df_merged = df_merged.drop(columns =['TOOLS', 'DP_x', 'AF_x', 'DP_y', 'AF_y', 'DP', 'AF'])
 
 def roundup(x):
+"""
+This function rounds up a number to the first higher 200-fold
+
+Argument: Float or Int
+
+Returns 200-fold int
+"""
     return int(math.ceil(x / 200.0)) * 200
     
   
@@ -126,7 +150,3 @@ hist_DP = df_merged['DP_mean'].plot_bokeh(
 
 pandas_bokeh.output_file('./output/'+ sample +"/Mean_Depth_&_AF_per_Mutation.html")  
 pandas_bokeh.plot_grid([[hist_AF], [hist_DP]], plot_width=1550, plot_height=440)
-
-
-
-
