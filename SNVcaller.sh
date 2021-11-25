@@ -1,15 +1,17 @@
 #TODO:
-# Stringdoc alle scriptjes
+# R sort scripts samenvoegen met argumenten
+# Sinvict to vcf. py Write loopjes in functie
 
-while getopts "R:L:I:O:V:D:C:" arg; do
+while getopts "R:L:I:O:V:D:C:P" arg; do
   case $arg in
-    R) Reference=$OPTARG;;
-    L) Listregions=$OPTARG;;
-    I) Inputbam=$OPTARG;;
+    R) Reference=$OPTARG;;      # "/apps/data/1000G/phase1/human_g1k_v37_phiX.fasta"
+    L) Listregions=$OPTARG;;    # "/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/2020_covered_probe_notranslocation.bed"
+    I) Inputbam=$OPTARG;;       # /groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/GenomeScan_SequenceData/103584/
     O) Outputdir=$OPTARG;;
-    V) VAF=$OPTARG;;
-    D) RDP=$OPTARG;;
-    C) Calls=$OPTARG;;
+    V) VAF=$OPTARG;;            # 0.004
+    D) RDP=$OPTARG;;            # 100
+    C) Calls=$OPTARG;;          # 1
+    P) PoN=$OPTARG;;            # Coming Soon!!
   esac
 done
 
@@ -27,18 +29,17 @@ module list
 #rm -rf ./temp
 mkdir ./output
 
-
 postprocess_vcf() {
   TOOL=$1
   ./tools/vt/vt decompose -s -o ./temp/${TOOL}/${TOOL}-decomposed.vcf ./temp/${TOOL}/${TOOL}.vcf
-  ./tools/vt/vt normalize -q -n -m -o ./temp/${TOOL}/${TOOL}-decomposed-normalized.vcf -r ../hg19upper.fna ./temp/${TOOL}/${TOOL}-decomposed.vcf
+  ./tools/vt/vt normalize -q -n -m -o ./temp/${TOOL}/${TOOL}-decomposed-normalized.vcf -r $Reference ./temp/${TOOL}/${TOOL}-decomposed.vcf
   bgzip ./temp/${TOOL}/${TOOL}-decomposed-normalized.vcf
   bcftools index ./temp/${TOOL}/${TOOL}-decomposed-normalized.vcf.gz  
 }
 
 pythonscript() {
   source ./env/bin/activate
-  python3 $1 $2 $3
+  python3 $1 $2 $3 $4
   deactivate
 }
 
@@ -48,10 +49,10 @@ run_tools() {
   mkdir ./temp/output-readcount && mkdir ./temp/output-sinvict  
   echo -e '\nPre-process bam and bed file: \n\n'
   ## Preprocessing .bam and .bed (removing 'chr')
-  samtools view -H $1 | sed 's/xxxxx//g' > ./temp/header.sam
+  samtools view -H $1 | sed 's/chr//g' > ./temp/header.sam
   samtools reheader ./temp/header.sam $1 > ./temp/newbam.bam
   samtools index ./temp/newbam.bam
-  sed 's/xxxxx//g' $Listregions > ./temp/newbed.bed
+  sed 's/chr//g' $Listregions > ./temp/newbed.bed
   
   ############# TOOLS: 
   ## Running all 4 tools simultaneously
@@ -129,7 +130,7 @@ run_tools() {
   ## Processing SiNVICT
   echo -e '\n\n\nProcessing SiNVICT data: \n\n'
   Rscript ./sort_sinvict.R
-  pythonscript ./sinvict_to_vcf.py ./temp/output-sinvict/calls_level1_sorted.sinvict ./temp/SV/SV.vcf
+  pythonscript ./sinvict_to_vcf.py ./temp/output-sinvict/calls_level1_sorted.sinvict ./temp/SV/SV.vcf $Reference
   postprocess_vcf "SV"
   
   ### Comparing Mutation call overlaps
@@ -154,7 +155,7 @@ process_bam() {
     ./temp/LF/LF-decomposed-normalized.vcf.gz \
     ./temp/VD/VD-decomposed-normalized.vcf.gz  
   pythonscript ./create_plots.py ${xpref}
-  rm -rf ./temp  
+  #rm -rf ./temp  
 }
 
 #Directory:
@@ -175,4 +176,3 @@ else
 fi
 
 echo -e '\nFinished! \n'
-
