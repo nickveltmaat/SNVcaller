@@ -64,6 +64,7 @@ Once all tools and pre-requisites are installed correctly, the pipeline can be c
 - `-D` minimum Read Depth:  **Int**       --> example: `100`
 - `-V` minimum VAF:         __float *[0-1]*__  --> example: `0.002`
 - `-C` minimum Calls:       __Int *[1-4]*__ --> example: `2`
+- `-P` Panel of Normal:     **String** --> example: `/path/to/PoN/directory/` (Coming soon!)
 
 
 Output will be generated in `/path/to/SNVcaller/output/name_of_.bam_file/`
