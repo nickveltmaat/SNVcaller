@@ -10,9 +10,10 @@ Date: 17-11-2021
 
 import sys
 import subprocess
-if len(sys.argv) != 3:
-  print("Usage:\t" + sys.argv[0] + "\t<input_sinvict_file_path>\t<output_filename>")
+if len(sys.argv) != 4:
+  print("Usage:\t" + sys.argv[0] + "\t<input_sinvict_file_path>\t<output_filename>\t<reference_fasta>")
   exit(0)
+  
   
 outfile = open(sys.argv[2], "w")
 outfile.write("##fileformat=VCFv4.3\n")
@@ -28,6 +29,7 @@ with open(sys.argv[1]) as infile:
 chroms2 = set(chroms)    
 for i in chroms2:
     outfile.write("##contig=<ID="+str(i)+">\n")
+
 
 outfile.write("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
 
@@ -47,7 +49,7 @@ with open(sys.argv[1]) as infile:
       #deletion
       position = int(position)
       position -= 1
-      fa = subprocess.check_output(["samtools", "faidx", "../hg19.fa", chromosome+":"+str(position)+"-"+str(position)])
+      fa = subprocess.check_output(["samtools", "faidx", sys.argv[3], chromosome+":"+str(position)+"-"+str(position)])
       base = fa.split("\n".encode())[1]
       base.rstrip()
       ref = base + str(alt[1:]).encode()
