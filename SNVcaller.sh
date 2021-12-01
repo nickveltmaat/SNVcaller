@@ -2,7 +2,7 @@
 # R sort scripts samenvoegen met argumenten
 # Sinvict to vcf. py Write loopjes in functie
 
-while getopts "R:L:I:O:V:D:C:P" arg; do
+while getopts "R:L:I:O:V:D:C:P:" arg; do
   case $arg in
     R) Reference=$OPTARG;;      # "/apps/data/1000G/phase1/human_g1k_v37_phiX.fasta"
     L) Listregions=$OPTARG;;    # "/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/2020_covered_probe_notranslocation.bed"
@@ -11,12 +11,13 @@ while getopts "R:L:I:O:V:D:C:P" arg; do
     V) VAF=$OPTARG;;            # 0.004
     D) RDP=$OPTARG;;            # 100
     C) Calls=$OPTARG;;          # 1
-    P) PoN=$OPTARG;;            # Coming Soon!!
+    P) PoN=$OPTARG;;            # "/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/GenomeScan_SequenceData/104103_normals/"
   esac
 done
 
 cd /groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/SNVcallingPipeline/
 
+echo -e "\nSettings: \n\nInput bam(s): $Inputbam \nReference: $Reference \nPanel: $Listregions\nminimum VAF: $VAF\nminimum Read Depth: $RDP\nminimum overlapping calls: $Calls\nPoN:$PoN"
 echo -e '\nLoading modules: \n'
 module load GATK/4.1.4.0-Java-8-LTS
 module load SAMtools/1.9-GCCcore-7.3.0
@@ -43,19 +44,47 @@ pythonscript() {
   deactivate
 }
 
+create_pon(){
+  #Step 1; Tumor only mode on all normal bam files
+  for entry in "$PoN"/*.bam
+  do
+    echo -e '\n\nGenerating VCF for normal control: '
+    echo normalcontrol= $(basename $entry .bam)
+    gatk Mutect2 --verbosity ERROR -R $Reference -I $entry --max-mnp-distance 0 -O ./PoN/normal_$(basename $entry .bam).vcf.gz --native-pair-hmm-threads 9 -L ./PoN/newbed.bed
+  done
+  
+  #Step 2 merge pon data
+  echo -e '\nMerging normal vcfs into GenomicsDB \n\n'
+  ls ./PoN/*vcf.gz > ./PoN/normals.dat
+  sed -i -e 's/^/ -V /' ./PoN/normals.dat
+  xargs -a ./PoN/normals.dat gatk --java-options "-Xmx8g" GenomicsDBImport --verbosity ERROR --genomicsdb-workspace-path ./PoN/controls_pon_db_chr -R $Reference -L 1 -L 2 -L 3 -L 4 -L 5 -L 6 -L 7 -L 8 -L 9 -L 10 -L 11 -L 12 -L 13 -L 14 -L 15 -L 16 -L 17 -L 18 -L 19 -L 20 -L 21 -L 22 -L X -L Y
+
+  #Step 3 create PoN VCF file 
+  echo -e '\nGenerating Panel Of Normals VCF file: \n\n'
+  gatk --java-options "-Xmx8g" CreateSomaticPanelOfNormals \
+    --verbosity ERROR -R $Reference \
+    -V gendb://$PWD/PoN/controls_pon_db_chr \
+    -O ./PoN/merged_PoN.vcf
+  
+  echo -e '\ndecomposing and normalizing PoN VCF file: \n\n' 
+  ./tools/vt/vt decompose -s -o ./PoN/merged_PoN-decomposed.vcf ./PoN/merged_PoN.vcf
+  ./tools/vt/vt normalize -q -n -m -o ./PoN/merged_PoN-decomposed-normalized.vcf -r $Reference ./PoN/merged_PoN-decomposed.vcf
+}
+
+
 run_tools() {
   # Creating temp dirs
   mkdir ./temp && mkdir ./temp/M2 && mkdir ./temp/VD && mkdir ./temp/LF && mkdir ./temp/SV
   mkdir ./temp/output-readcount && mkdir ./temp/output-sinvict  
-  echo -e '\nPre-process bam and bed file: \n\n'
-  ## Preprocessing .bam and .bed (removing 'chr')
+  echo -e '\nPre-processing bam file... \n\n'
+  ## Preprocessing .bam and (removing 'chr')
+  sed 's/chr//g' $Listregions > ./temp/newbed.bed
   samtools view -H $1 | sed 's/chr//g' > ./temp/header.sam
   samtools reheader ./temp/header.sam $1 > ./temp/newbam.bam
   samtools index ./temp/newbam.bam
-  sed 's/chr//g' $Listregions > ./temp/newbed.bed
-  
+
   ############# TOOLS: 
-  ## Running all 4 tools simultaneously
+  echo -e '\nRunning all 4 tools simultaneously...\n'
   #Lofreq
   ./tools/lofreq/src/lofreq/lofreq call-parallel \
      --pp-threads 8 \
@@ -67,7 +96,7 @@ run_tools() {
      ./temp/newbam.bam && \
   #Filter Lofreq     
   ./tools/lofreq/src/lofreq/lofreq filter \
-    -i ./temp/LF/output_lofreq_bed.vcf \
+      -i ./temp/LF/output_lofreq_bed.vcf \
       -o ./temp/LF/LF.vcf \
       -v $RDP \
       -a $VAF & \
@@ -142,9 +171,9 @@ process_bam() {
   a=$1
   xbase=${a##*/}
   xpref=${xbase%.*}
-  echo sample= ${xpref}
-  mkdir ./output/${xpref}  
+  echo sample= ${xpref} 
   run_tools $a
+  mkdir ./output/${xpref} 
   echo -e '\nComparing SNV Tools: \n'
   bcftools isec \
     -p ./output/${xpref} \
@@ -154,21 +183,41 @@ process_bam() {
     ./temp/M2/M2-decomposed-normalized.vcf.gz \
     ./temp/LF/LF-decomposed-normalized.vcf.gz \
     ./temp/VD/VD-decomposed-normalized.vcf.gz  
-  pythonscript ./create_plots.py ${xpref}
-  #rm -rf ./temp  
+  
+  if [ -z "$PoN" ]
+  then
+    echo "No PoN mode"
+  else
+    echo "source for PoN .bam files = $PoN"
+    pythonscript ./pon_blacklist.py ${xpref}
+    pythonscript ./create_plots.py ${xpref} "sites_PoN.txt"
+  fi    
+  pythonscript ./create_plots.py ${xpref} "sites.txt"
+  
+  rm -rf ./temp  
 }
+
+# Create PoN if argument is given:
+if [ -z "$PoN" ]
+then
+  echo -e "No PoN mode\n\n"
+else
+  echo -e "\nPoN included: source for PoN .bam files = $PoN"
+  echo -e 'Generating PoN from normal samples: \n\n'
+  mkdir ./PoN/
+  sed 's/chr//g' $Listregions > ./PoN/newbed.bed
+  create_pon
+fi
 
 #Directory:
 if [[ -d $Inputbam ]]; then
     for entry in "$Inputbam"/*.bam
     do
       process_bam $entry
-    done
-    
+    done  
 #One-File:     
 elif [[ -f $Inputbam ]]; then
     process_bam $Inputbam
-
 #Else (error)
 else
     echo "$Inputbam is not valid"
@@ -176,3 +225,4 @@ else
 fi
 
 echo -e '\nFinished! \n'
+
