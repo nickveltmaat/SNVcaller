@@ -22,8 +22,17 @@ from functools import reduce
 
 ## Venn Diagram
 sample = sys.argv[1]
+data = sys.argv[2]
+
+if data == 'sites.txt':
+  pontype = ""
+elif data == 'sites_PoN.txt':
+  pontype = "PoN"
+else:
+  print("Wrong input")
+
 print('sample = '+sample)
-sites = glob.glob('./output/'+ sample +'/sites.txt')
+sites = glob.glob('./output/'+ sample +'/' + data)
 
 df = pd.read_csv(sites[0], sep='\t', header=None)
 df[4] = df[4].astype(str)
@@ -58,30 +67,30 @@ from venn import venn
 fig = venn(SNVcalls
      #, fmt="{percentage:.1f}%"
     ).figure
-fig.suptitle(sys.argv[1], fontsize=15)
+fig.suptitle(sys.argv[1] + "  " + pontype, fontsize=15)
 plt.xlabel('Total # of mutations: '+ str(len(df)), fontsize=12)
-fig.savefig('./output/'+ sample +'/venn.png')   # save the figure to file
+fig.savefig('./output/'+ sample + '/venn'+ pontype+ '.png')   # save the figure to file
 plt.close(fig) 
 len(df)
 
 
 ## Histograms
 def read_vcf(path):
-"""
-This function reads a .vcf file and stores it as a df.
-
-Required Argument: path to .vcf file
-
-Returns: Dataframe
-"""
-    with open(path, 'r') as f:
-        lines = [l for l in f if not l.startswith('##')]
-    return pd.read_csv(
-        io.StringIO(''.join(lines)),
-        dtype={'#CHROM': str, 'POS': int, 'ID': str, 'REF': str, 'ALT': str,
-               'QUAL': str, 'FILTER': str, 'INFO': str},
-        sep='\t'
-    ).rename(columns={'#CHROM': 'CHROM'})
+  """
+  This function reads a .vcf file and stores it as a df.
+  
+  Required Argument: path to .vcf file
+  
+  Returns: Dataframe
+  """
+  with open(path, 'r') as f:
+      lines = [l for l in f if not l.startswith('##')]
+  return pd.read_csv(
+      io.StringIO(''.join(lines)),
+      dtype={'#CHROM': str, 'POS': int, 'ID': str, 'REF': str, 'ALT': str,
+             'QUAL': str, 'FILTER': str, 'INFO': str},
+      sep='\t'
+  ).rename(columns={'#CHROM': 'CHROM'})
 
 #Stripped Mutect2 output:
 dfm2 = read_vcf('./output/'+ sample +'/0001.vcf')
@@ -110,15 +119,31 @@ df_merged["AF_mean"] = df_merged[["AF", "AF_x", "AF_y"]].mean(axis=1)
 df_merged["DP_mean"] = df_merged[["DP", "DP_x", "DP_y"]].mean(axis=1).round()
 df_merged = df_merged.drop(columns =['TOOLS', 'DP_x', 'AF_x', 'DP_y', 'AF_y', 'DP', 'AF'])
 
+if data == 'sites.txt':
+  pass
+elif data == 'sites_PoN.txt':
+  df_merged = df_merged[df_merged['REF'].notna()]
+  df_merged['mut'] = df_merged['CHROM'] + '_' + df_merged['POS'].astype(str)+'_' + df_merged['REF'] +'>' + df_merged['ALT']
+  
+  dfPON = read_vcf("./PoN/merged_PoN-decomposed-normalized.vcf")
+  dfPON['mut'] = dfPON['CHROM'] + '_' + dfPON['POS'].astype(str)+'_' + dfPON['REF'] +'>' + dfPON['ALT']
+  
+  df_merged[~df_merged.mut.isin(dfPON['mut'])].drop(['mut'], axis=1)
+else:
+  print("Wrong input")
+  
+df_merged.to_csv('./output/'+ sample + '/vcfs_merged.tsv', sep='\t', index = False, header= True)
+
+
 def roundup(x):
-"""
-This function rounds up a number to the first higher 200-fold
-
-Argument: Float or Int
-
-Returns 200-fold int
-"""
-    return int(math.ceil(x / 200.0)) * 200
+  """
+  This function rounds up a number to the first higher 200-fold
+  
+  Argument: Float or Int
+  
+  Returns 200-fold int
+  """
+  return int(math.ceil(x / 200.0)) * 200
     
   
 hist_AF = df_merged['AF_mean'].plot_bokeh(
@@ -134,9 +159,23 @@ hist_AF = df_merged['AF_mean'].plot_bokeh(
     line_color="black",
     show_figure = False)
 
+hist_AF2 = df_merged['AF_mean'].plot_bokeh(
+    kind="hist",
+    color='darkblue',
+    bins=np.linspace(0, 0.01, 21),
+    histogram_type="sidebyside",
+    vertical_xlabel=True,
+    hovertool=True,
+    title="Allele Frequency " + sample,
+    ylabel = '# Of mutations',
+    xlabel = 'Mean Allele Frequency per mutation, calculated by Mutect2, LoFreq & VarDict, Zoomed in on 0 - 0.001',
+    legend = None,
+    line_color="black",
+    show_figure = False)
 
 hist_DP = df_merged['DP_mean'].plot_bokeh(
     kind="hist",
+    color='green',
     bins=np.linspace(0, roundup(df_merged['DP_mean'].max()), int(roundup(df_merged['DP_mean'].max())/200+1)),
     histogram_type="sidebyside",
     vertical_xlabel=True,
@@ -148,5 +187,5 @@ hist_DP = df_merged['DP_mean'].plot_bokeh(
     line_color="black",
     show_figure = False)
 
-pandas_bokeh.output_file('./output/'+ sample +"/Mean_Depth_&_AF_per_Mutation.html")  
-pandas_bokeh.plot_grid([[hist_AF], [hist_DP]], plot_width=1550, plot_height=440)
+pandas_bokeh.output_file('./output/'+ sample +"/Mean_Depth_&_AF_per_Mutation_"+ pontype + ".html")  
+pandas_bokeh.plot_grid([[hist_AF], [hist_AF2], [hist_DP]], plot_width=1500, plot_height=440)
