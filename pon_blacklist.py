@@ -15,12 +15,6 @@ sample = sys.argv[1]
 print('sample = '+sample)
 sites = glob.glob('./output/'+ sample +'/sites.txt')
 
-
-print(sites[0])
-
-
-
-
 def read_vcf(path):
   """
   This function reads a .vcf file and stores it as a df.
