@@ -31,7 +31,6 @@ elif data == 'sites_PoN.txt':
 else:
   print("Wrong input")
 
-print('sample = '+sample)
 sites = glob.glob('./output/'+ sample +'/' + data)
 
 df = pd.read_csv(sites[0], sep='\t', header=None)
