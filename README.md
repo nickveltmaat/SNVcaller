@@ -17,7 +17,7 @@ This is a pipeline made to reliably generate calls for somatic mutations in Low 
 
 The general workflow in the pipeline is as follows: 
 
-`.BAM` and `.bed` files are copied to a temporary folder, where the processing happens. Ather that, the 4 tools will run in parralel, generating preliminary results which are also stored in the temporary folder. Since `VarDict` and `SiNVICT` don't output regular `.vcf` files, this data first needs to be processed in order to compare the overlapping variants in the `.vcf` files. This processing consists of sorting variants and generating `.vcf` files, which is done with custom Python and R scripts. Then, all `.vcf` files are [decomposed](https://genome.sph.umich.edu/wiki/Vt#Decompose), [normalized](https://genome.sph.umich.edu/wiki/Vt#Normalization), gunzipped and indexed. Finally, with all `.vcf` files processed, the variants can be compared on overlapping variants. All variants called with `x` or more tools will be saved. Also a venn diagram of mutation calls per tool is generated, together with histograms of amount of mutations with a certain VAF & Read Depth. VAF & Read Depth are calculated with the data from `VarDict`, `LoFreq`, `Mutect2`, since `SiNVICT` doensn't output this data. 
+`.BAM` and `.bed` files are copied to a temporary folder, where the processing happens. Ather that, the 4 tools will run in parralel, generating preliminary results which are also stored in the temporary folder. Since `VarDict` and `SiNVICT` don't output regular `.vcf` files, this data first needs to be processed in order to compare the overlapping variants in the `.vcf` files. This processing consists of sorting variants and generating `.vcf` files, which is done with custom Python and R scripts. Then, all `.vcf` files are [decomposed](https://genome.sph.umich.edu/wiki/Vt#Decompose), [normalized](https://genome.sph.umich.edu/wiki/Vt#Normalization), gunzipped and indexed. Finally, with all `.vcf` files processed, the variants can be compared on overlapping variants. All variants called with `x` or more tools will be saved. Also a venn diagram of mutation calls per tool is generated, together with histograms of amount of mutations with a certain VAF & Read Depth. VAF & Read Depth are calculated with the data from `VarDict`, `LoFreq`, `Mutect2`, since `SiNVICT` doensn't output this data. A folder contatining normal samples can be provided to generate a Panal of Normals (PoN) a.k.a. a blacklist. This can be used to filter out SNP's and/or technical artifacts (when the same library prep and sequencing methods are performed as in tumor samples). Finally, the remaining variants will be annotated using [openCRAVAT](https://opencravat.org/).
 
 *n.b. : A single `.bam` file or a directory containing `.bam` files can be given as arguments. When a directory is given, the process above will loop over all files, generating output folders for each `.bam` file* 
 
@@ -46,6 +46,12 @@ pip3 install venn
 pip3 install matplotlib
 pip3 install pandas_bokeh
 pip3 install glob
+pip install open-cravat
+oc module install-base
+oc module install clinvar
+oc module install civic_gene
+oc module install cgc
+oc module install cgl
 deactivate
 ```
 **5. [Download](https://drive.google.com/drive/folders/1QBt0NdPqjQU_y-A7omxoyiPfl1DL65Xn?usp=sharing) and copy the pre-built tools to `/path/to/SNVCaller/` and unzip**
