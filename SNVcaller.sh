@@ -1,12 +1,13 @@
 #TODO:
 # R sort scripts samenvoegen met argumenten
 # Sinvict to vcf. py Write loopjes in functie
+# Default values for parameters (if argument is given > overwrite..
 
 while getopts "R:L:I:O:V:D:C:P:" arg; do
   case $arg in
     R) Reference=$OPTARG;;      # "/apps/data/1000G/phase1/human_g1k_v37_phiX.fasta"
     L) Listregions=$OPTARG;;    # "/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/2020_covered_probe_notranslocation.bed"
-    I) Inputbam=$OPTARG;;       # /groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/GenomeScan_SequenceData/103584/
+    I) Inputbam=$OPTARG;;       # "/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/GenomeScan_SequenceData/103584/"
     O) Outputdir=$OPTARG;;
     V) VAF=$OPTARG;;            # 0.004
     D) RDP=$OPTARG;;            # 100
@@ -171,7 +172,7 @@ process_bam() {
   a=$1
   xbase=${a##*/}
   xpref=${xbase%.*}
-  echo sample= ${xpref} 
+  echo -e "\nProcessing sample $xpref\n"  
   run_tools $a
   mkdir ./output/${xpref} 
   echo -e '\nComparing SNV Tools: \n'
@@ -186,15 +187,26 @@ process_bam() {
   
   if [ -z "$PoN" ]
   then
-    echo "No PoN mode"
+    echo ""
   else
-    echo "source for PoN .bam files = $PoN"
+    echo -e "source for PoN .bam files = $PoN \n\nBlacklisting...\n"
     pythonscript ./pon_blacklist.py ${xpref}
     pythonscript ./create_plots.py ${xpref} "sites_PoN.txt"
   fi    
   pythonscript ./create_plots.py ${xpref} "sites.txt"
   
+  ##Test ANNOTATION (make it pon or not)
+  echo 'annotating variants...'
+  source ./env/bin/activate
+  oc run ./output/${xpref}/sites.txt \
+    -l hg19 \
+    -n annotated_SNVs --silent \
+    -a clinvar civic_gene cgc cgl \
+    -t excel
+  deactivate 
+  ## EndTest
   rm -rf ./temp  
+  echo -e "\nAnalysis of $xpref is complete!\n\n\n"
 }
 
 # Create PoN if argument is given:
@@ -224,5 +236,4 @@ else
     exit 1
 fi
 
-echo -e '\nFinished! \n'
-
+echo -e '\nFinished run! \n'
