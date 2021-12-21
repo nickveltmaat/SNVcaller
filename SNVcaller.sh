@@ -2,6 +2,8 @@
 # R sort scripts samenvoegen met argumenten
 # Sinvict to vcf. py Write loopjes in functie
 # Default values for parameters (if argument is given > overwrite..
+# Elke tool in een functie. input en bed als parameters
+# oc run in een functie
 
 while getopts "R:L:I:O:V:D:C:P:" arg; do
   case $arg in
@@ -32,44 +34,134 @@ module list
 mkdir ./output
 
 postprocess_vcf() {
-  TOOL=$1
-  ./tools/vt/vt decompose -s -o ./temp/${TOOL}/${TOOL}-decomposed.vcf ./temp/${TOOL}/${TOOL}.vcf
-  ./tools/vt/vt normalize -q -n -m -o ./temp/${TOOL}/${TOOL}-decomposed-normalized.vcf -r $Reference ./temp/${TOOL}/${TOOL}-decomposed.vcf
-  bgzip ./temp/${TOOL}/${TOOL}-decomposed-normalized.vcf
-  bcftools index ./temp/${TOOL}/${TOOL}-decomposed-normalized.vcf.gz  
+  Input=$1
+  ./tools/vt/vt decompose -s -o $(dirname $Input)/$(basename $Input .vcf)-decomposed.vcf ${Input}
+  ./tools/vt/vt normalize -q -n -m -o $(dirname $Input)/$(basename $Input .vcf)-decomposed-normalized.vcf -r $Reference $(dirname $Input)/$(basename $Input .vcf)-decomposed.vcf
+  bgzip $(dirname $Input)/$(basename $Input .vcf)-decomposed-normalized.vcf
+  bcftools index $(dirname $Input)/$(basename $Input .vcf)-decomposed-normalized.vcf.gz
 }
 
 pythonscript() {
   source ./env/bin/activate
-  python3 $1 $2 $3 $4
+  python3 $1 $2 $3 $4 $5
   deactivate
 }
 
 create_pon(){
+  echo -e "\nPoN included: source for PoN .bam files = $PoN"
+  echo -e 'Generating PoN from normal samples: \n\n'
   #Step 1; Tumor only mode on all normal bam files
   for entry in "$PoN"/*.bam
   do
     echo -e '\n\nGenerating VCF for normal control: '
     echo normalcontrol= $(basename $entry .bam)
-    gatk Mutect2 --verbosity ERROR -R $Reference -I $entry --max-mnp-distance 0 -O ./PoN/normal_$(basename $entry .bam).vcf.gz --native-pair-hmm-threads 9 -L ./PoN/newbed.bed
+    #Mutect
+    gatk Mutect2 --verbosity ERROR -R $Reference -I $entry \
+      --max-mnp-distance 0 -O ./PoN/normal_$(basename $entry .bam)_Mutect.vcf.gz \
+      --callable-depth $RDP \
+      --minimum-allele-fraction $VAF \
+      --native-pair-hmm-threads 9 -L ./PoN/newbed.bed --QUIET &
+    #Vardict
+    ~/.conda/pkgs/vardict-java-1.8.2-hdfd78af_3/bin/vardict-java \
+      -f $VAF \
+      -th 8 \
+      -G $Reference \
+      -b $entry \
+      -c 1 -S 2 -E 3 \
+      ./PoN/newbed.bed > ./PoN/normal_$(basename $entry .bam)_Vardict1.vcf &   
+    #Lofreq
+    ./tools/lofreq/src/lofreq/lofreq call-parallel \
+       --pp-threads 8 \
+       --call-indels \
+       --no-default-filter \
+       -f $Reference \
+       -o ./PoN/normal_$(basename $entry .bam)_LofreqUnfiltered.vcf \
+       -l ./PoN/newbed.bed \
+       $entry &&
+       
+      #Filter Lofreq     
+    ./tools/lofreq/src/lofreq/lofreq filter \
+      -i ./PoN/normal_$(basename $entry .bam)_LofreqUnfiltered.vcf \
+      -o ./PoN/normal_$(basename $entry .bam)_Lofreq.vcf  \
+      -v $RDP \
+      -a $VAF & \
+       
+    #SiNVICT
+    mkdir ./PoN/$(basename $entry .bam)output-readcount/ && mkdir ./PoN/$(basename $entry .bam)output-sinvict/ && \
+    ./tools/sinvict/bam-readcount/build/bin/bam-readcount \
+      -l ./PoN/newbed.bed \
+      -w 1 \
+      -f $Reference \
+      $entry > ./PoN/$(basename $entry .bam)output-readcount/output.readcount && \
+    
+    ./tools/sinvict/sinvict \
+      -m $RDP \
+      -f $VAF \
+      -t ./PoN/$(basename $entry .bam)output-readcount/ \
+      -o ./PoN/$(basename $entry .bam)output-sinvict/ && \
+    
+    rm -rf ./PoN/$(basename $entry .bam)output-readcount/
+    wait
+    
+    Rscript ./sort_vardict.R ./PoN/normal_$(basename $entry .bam)_Vardict1.vcf ./PoN/normal_$(basename $entry .bam)_Vardict2.vcf
+    pythonscript ./vardict_vcf.py ./PoN/normal_$(basename $entry .bam)_Vardict2.vcf ./PoN/normal_$(basename $entry .bam)_Vardict.vcf
+    Rscript ./sort_sinvict.R ./PoN/$(basename $entry .bam)output-sinvict/calls_level1.sinvict ./PoN/$(basename $entry .bam)output-sinvict/calls_level1_sorted.sinvict
+    pythonscript ./create_vcf.py ./PoN/$(basename $entry .bam)output-sinvict/calls_level1_sorted.sinvict ./PoN/normal_$(basename $entry .bam)_Sinvict.vcf $Reference 'sinvict'
+    
+    bgzip ./PoN/normal_$(basename $entry .bam)_Vardict.vcf
+    bcftools index ./PoN/normal_$(basename $entry .bam)_Vardict.vcf.gz
+    bgzip ./PoN/normal_$(basename $entry .bam)_Lofreq.vcf
+    bcftools index ./PoN/normal_$(basename $entry .bam)_Lofreq.vcf.gz   
+    bgzip ./PoN/normal_$(basename $entry .bam)_Sinvict.vcf
+    bcftools index ./PoN/normal_$(basename $entry .bam)_Sinvict.vcf.gz
   done
   
   #Step 2 merge pon data
   echo -e '\nMerging normal vcfs into GenomicsDB \n\n'
-  ls ./PoN/*vcf.gz > ./PoN/normals.dat
-  sed -i -e 's/^/ -V /' ./PoN/normals.dat
-  xargs -a ./PoN/normals.dat gatk --java-options "-Xmx8g" GenomicsDBImport --verbosity ERROR --genomicsdb-workspace-path ./PoN/controls_pon_db_chr -R $Reference -L 1 -L 2 -L 3 -L 4 -L 5 -L 6 -L 7 -L 8 -L 9 -L 10 -L 11 -L 12 -L 13 -L 14 -L 15 -L 16 -L 17 -L 18 -L 19 -L 20 -L 21 -L 22 -L X -L Y
+  ls ./PoN/*Mutect.vcf.gz > ./PoN/M2normals.dat
+  ls ./PoN/*Vardict.vcf.gz > ./PoN/VDnormals.dat
+  ls ./PoN/*Lofreq.vcf.gz > ./PoN/LFnormals.dat
+  ls ./PoN/*Sinvict.vcf.gz > ./PoN/SVnormals.dat
+  sed -i -e 's/^/ -V /' ./PoN/M2normals.dat
+  sed -i -e 's/^/ /' ./PoN/VDnormals.dat
+  sed -i -e 's/^/ /' ./PoN/LFnormals.dat
+  sed -i -e 's/^/ /' ./PoN/SVnormals.dat
+  xargs -a ./PoN/M2normals.dat gatk --java-options "-Xmx8g" GenomicsDBImport --verbosity ERROR --genomicsdb-workspace-path ./PoN/M2controls_pon_db_chr -R $Reference -L 1 -L 2 -L 3 -L 4 -L 5 -L 6 -L 7 -L 8 -L 9 -L 10 -L 11 -L 12 -L 13 -L 14 -L 15 -L 16 -L 17 -L 18 -L 19 -L 20 -L 21 -L 22 -L X -L Y --QUIET
 
-  #Step 3 create PoN VCF file 
+  #Step 3 create merged PoN VCF file 
   echo -e '\nGenerating Panel Of Normals VCF file: \n\n'
   gatk --java-options "-Xmx8g" CreateSomaticPanelOfNormals \
     --verbosity ERROR -R $Reference \
-    -V gendb://$PWD/PoN/controls_pon_db_chr \
-    -O ./PoN/merged_PoN.vcf
+    --QUIET \
+    -V gendb://$PWD/PoN/M2controls_pon_db_chr \
+    -O ./PoN/merged_PoN_Mutect2.vcf
   
+  xargs -a ./PoN/VDnormals.dat bcftools isec -o ./PoN/Xmerged_PoN_Vardict.vcf -O v -n +2 
+  xargs -a ./PoN/LFnormals.dat bcftools isec -o ./PoN/Xmerged_PoN_Lofreq.vcf -O v -n +2 
+  xargs -a ./PoN/SVnormals.dat bcftools isec -o ./PoN/Xmerged_PoN_Sinvict.vcf -O v -n +2 
   echo -e '\ndecomposing and normalizing PoN VCF file: \n\n' 
-  ./tools/vt/vt decompose -s -o ./PoN/merged_PoN-decomposed.vcf ./PoN/merged_PoN.vcf
-  ./tools/vt/vt normalize -q -n -m -o ./PoN/merged_PoN-decomposed-normalized.vcf -r $Reference ./PoN/merged_PoN-decomposed.vcf
+
+  pythonscript ./create_vcf.py ./PoN/Xmerged_PoN_Vardict.vcf ./PoN/merged_PoN_Vardict.vcf $Reference 'bcftools_isec'
+  pythonscript ./create_vcf.py ./PoN/Xmerged_PoN_Lofreq.vcf ./PoN/merged_PoN_Lofreq.vcf $Reference 'bcftools_isec'
+  pythonscript ./create_vcf.py ./PoN/Xmerged_PoN_Sinvict.vcf ./PoN/merged_PoN_Sinvict.vcf $Reference 'bcftools_isec'
+  postprocess_vcf "./PoN/merged_PoN_Vardict.vcf"
+  postprocess_vcf "./PoN/merged_PoN_Lofreq.vcf"
+  postprocess_vcf "./PoN/merged_PoN_Sinvict.vcf"
+  postprocess_vcf "./PoN/merged_PoN_Mutect2.vcf"
+  
+  
+  bcftools isec -o ./PoN/BLACKLIST.txt -O v -n +2 ./PoN/merged_PoN_Sinvict-decomposed-normalized.vcf.gz ./PoN/merged_PoN_Mutect2-decomposed-normalized.vcf.gz ./PoN/merged_PoN_Lofreq-decomposed-normalized.vcf.gz ./PoN/merged_PoN_Vardict-decomposed-normalized.vcf.gz
+  #rm -rf ./PoN/normal* && rm -rf ./PoN/*.dat && rm -rf ./PoN/merged_*.*
+  
+  #annotating the PoN blacklist  
+  source ./env/bin/activate
+  oc run ./PoN/BLAKCLIST.txt \
+    -l hg19 \
+    -n annotated_blacklist --silent \
+    -a clinvar civic cgc cgl cadd cancer_genome_interpreter cancer_hotspots chasmplus chasmplus_DLBC chasmplus_DLBC_mski \
+       clinpred cosmic cscape dbsnp gnomad mutation_assessor thousandgenomes vest cadd_exome gnomad3 thousandgenomes_european \
+    -t excel 
+  deactivate
 }
 
 
@@ -145,26 +237,25 @@ run_tools() {
   
   ## Processing LoFreq:
   echo -e '\n\n\nProcessing LoFreq data: \n\n'
-  postprocess_vcf "LF"
+  postprocess_vcf "./temp/LF/LF.vcf"
   
   ## Processing Mutect2:
   echo -e '\n\n\nProcessing Mutect2: \n\n'
-  postprocess_vcf "M2"
+  postprocess_vcf "./temp/M2/M2.vcf"
   
   ## Processing VarDict
   echo -e '\n\n\nProcessing Vardict data: \n\n'
-  Rscript ./sort_vardict.R
-  pythonscript ./vardict_vcf.py
-  postprocess_vcf "VD"
+  Rscript ./sort_vardict.R ./temp/VD/vardict_raw.vcf ./temp/VD/vardict_output_sorted.vcf
+  pythonscript ./vardict_vcf.py ./temp/VD/vardict_output_sorted.vcf ./temp/VD/VD.vcf
+  postprocess_vcf "./temp/VD/VD.vcf"
   
   ## Processing SiNVICT
   echo -e '\n\n\nProcessing SiNVICT data: \n\n'
-  Rscript ./sort_sinvict.R
-  pythonscript ./sinvict_to_vcf.py ./temp/output-sinvict/calls_level1_sorted.sinvict ./temp/SV/SV.vcf $Reference
-  postprocess_vcf "SV"
-  
-  ### Comparing Mutation call overlaps
-  wait
+  Rscript ./sort_sinvict.R ./temp/output-sinvict/calls_level1.sinvict ./temp/output-sinvict/calls_level1_sorted.sinvict
+  pythonscript ./create_vcf.py ./temp/output-sinvict/calls_level1_sorted.sinvict ./temp/SV/SV.vcf $Reference 'sinvict'
+  postprocess_vcf "./temp/SV/SV.vcf"
+
+  wait 
   echo -e '\nData processed with all 4 tools\n\n'
 }
 
@@ -184,7 +275,8 @@ process_bam() {
     ./temp/M2/M2-decomposed-normalized.vcf.gz \
     ./temp/LF/LF-decomposed-normalized.vcf.gz \
     ./temp/VD/VD-decomposed-normalized.vcf.gz  
-  
+
+  #Plotting and Annotating blacklisted SNV's
   if [ -z "$PoN" ]
   then
     echo ""
@@ -192,19 +284,30 @@ process_bam() {
     echo -e "source for PoN .bam files = $PoN \n\nBlacklisting...\n"
     pythonscript ./pon_blacklist.py ${xpref}
     pythonscript ./create_plots.py ${xpref} "sites_PoN.txt"
-  fi    
-  pythonscript ./create_plots.py ${xpref} "sites.txt"
+    source ./env/bin/activate
+    
+    echo 'annotating variants filterd by pon...' 
+    oc run ./output/${xpref}/sites_PoN.txt \
+      -l hg19 \
+      -n annotated_SNVs_PoN_blacklisted --silent \
+      -a clinvar civic cgc cgl cadd cancer_genome_interpreter cancer_hotspots chasmplus chasmplus_DLBC chasmplus_DLBC_mski \
+         clinpred cosmic cscape dbsnp gnomad mutation_assessor thousandgenomes vest cadd_exome gnomad3 thousandgenomes_european \
+      -t excel
+    deactivate 
+  fi 
   
-  ##Test ANNOTATION (make it pon or not)
+  #Plotting and Annotating SNV's   
+  pythonscript ./create_plots.py ${xpref} "sites.txt"
   echo 'annotating variants...'
   source ./env/bin/activate
   oc run ./output/${xpref}/sites.txt \
     -l hg19 \
     -n annotated_SNVs --silent \
-    -a clinvar civic_gene cgc cgl \
+    -a clinvar civic cgc cgl cadd cancer_genome_interpreter cancer_hotspots chasmplus chasmplus_DLBC chasmplus_DLBC_mski \
+       clinpred cosmic cscape dbsnp gnomad mutation_assessor thousandgenomes vest cadd_exome gnomad3 thousandgenomes_european \
     -t excel
   deactivate 
-  ## EndTest
+  
   rm -rf ./temp  
   echo -e "\nAnalysis of $xpref is complete!\n\n\n"
 }
@@ -214,10 +317,9 @@ if [ -z "$PoN" ]
 then
   echo -e "No PoN mode\n\n"
 else
-  echo -e "\nPoN included: source for PoN .bam files = $PoN"
-  echo -e 'Generating PoN from normal samples: \n\n'
   mkdir ./PoN/
   sed 's/chr//g' $Listregions > ./PoN/newbed.bed
+  #bash ./Create_PoN.sh "$@"
   create_pon
 fi
 
@@ -237,3 +339,4 @@ else
 fi
 
 echo -e '\nFinished run! \n'
+
