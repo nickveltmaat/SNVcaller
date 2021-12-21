@@ -1,8 +1,20 @@
+#!/usr/bin/env Rscript
+
 # This script automatically sorts Sinvict output file by Chr and Pos
 # Author: Nick Veltmaat
-# Date: 25-11-2021
+# Date: 17-11-2021
 
-df <- read.table(file = './temp/output-sinvict/calls_level1.sinvict', sep = '\t', header = F)
+args = commandArgs(trailingOnly=TRUE)
+
+# test if there is two arguments passed: if not, return an error
+if (length(args)!=2) {
+  stop("At least two arguments must be supplied (input file, output file).n", call.=FALSE)
+} 
+
+input = args[1]
+output = args[2]
+
+df <- read.table(file = toString(input), sep = '\t', header = F)
 
 #Adding 'chr'
 df$V1 <- sub("^", "chr", df$V1 )
@@ -14,4 +26,4 @@ df <- df[order(df$V1, df$V2),]
 
 
 df$V1 <- sub("chr", "", df$V1 )
-write.table(df,'./temp/output-sinvict/calls_level1_sorted.sinvict',sep="\t",row.names=FALSE, col.names = FALSE, quote = FALSE)
+write.table(df, toString(output) ,sep="\t",row.names=FALSE, col.names = FALSE, quote = FALSE)
