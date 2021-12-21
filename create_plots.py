@@ -5,7 +5,7 @@ Generates Histogram of amount of mutations with a certain Read Depth
 Generates Histogram of amount of mutations with a certain VAF (Variant Allele Frequency)
 
 Author: Nick Veltmaat
-Date: 17-11-2021
+Date: 21-12-2021
 """
 
 import io
@@ -124,8 +124,8 @@ elif data == 'sites_PoN.txt':
   df_merged = df_merged[df_merged['REF'].notna()]
   df_merged['mut'] = df_merged['CHROM'] + '_' + df_merged['POS'].astype(str)+'_' + df_merged['REF'] +'>' + df_merged['ALT']
   
-  dfPON = read_vcf("./PoN/merged_PoN-decomposed-normalized.vcf")
-  dfPON['mut'] = dfPON['CHROM'] + '_' + dfPON['POS'].astype(str)+'_' + dfPON['REF'] +'>' + dfPON['ALT']
+  dfPON = pd.read_csv('./PoN/BLACKLIST.txt', sep='\t', header=None)
+  dfPON['mut'] = dfPON[0].astype(str) + '_' + dfPON[1].astype(str)+'_' + dfPON[2] +'>' + dfPON[3]
   
   df_merged[~df_merged.mut.isin(dfPON['mut'])].drop(['mut'], axis=1)
 else:
