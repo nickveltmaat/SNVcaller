@@ -6,14 +6,12 @@ Author: Nick Veltmaat
 Date: 1-12-2021
 """
 import pandas as pd
-import glob
 import numpy as np
 import io
 import sys
 
-sample = sys.argv[1]
+sample = str(sys.argv[1])
 print('sample = '+sample)
-sites = glob.glob('./output/'+ sample +'/sites.txt')
 
 def read_vcf(path):
   """
@@ -32,14 +30,12 @@ def read_vcf(path):
       sep='\t'
   ).rename(columns={'#CHROM': 'CHROM'})
   
-  
-dfPON = read_vcf("./PoN/merged_PoN-decomposed-normalized.vcf")
-dfPON['mut'] = dfPON['CHROM'] + '_' + dfPON['POS'].astype(str)+'_' + dfPON['REF'] +'>' + dfPON['ALT']
+dfPON = pd.read_csv('./PoN/BLACKLIST.txt', sep='\t', header=None)
+dfPON['mut'] = dfPON[0].astype(str) + '_' + dfPON[1].astype(str)+'_' + dfPON[2] +'>' + dfPON[3]
 
-df = pd.read_csv(sites[0], sep='\t', header=None)
+df = pd.read_csv('./output/'+ sample +'/sites.txt', sep='\t', header=None)
 df[4] = df[4].astype(str)
 df[4] = df[4].apply(lambda x: x.zfill(4))
 df['mut'] = df[0] + '_' + df[1].astype(str)+'_' + df[2] +'>' + df[3]
 
 df[~df.mut.isin(dfPON['mut'])].drop(['mut'], axis=1).to_csv('./output/'+ sample + '/sites_PoN.txt', sep='\t', index = False, header= False)
-
