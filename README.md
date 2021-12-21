@@ -48,10 +48,8 @@ pip3 install pandas_bokeh
 pip3 install glob
 pip install open-cravat
 oc module install-base
-oc module install clinvar
-oc module install cosmic
-oc module install ...  (see https://open-cravat.readthedocs.io/en/latest/1.-Installation-Instructions.html for more detailed instructions)
 oc module ls -a -t annotator  (this generartes a list of available annotators that can be downloaded)
+oc module install clinvar cosmic dbsnp ...  (see https://open-cravat.readthedocs.io/en/latest/1.-Installation-Instructions.html for more detailed instructions)
 deactivate
 ```
 **5. [Download](https://drive.google.com/drive/folders/1QBt0NdPqjQU_y-A7omxoyiPfl1DL65Xn?usp=sharing) and copy the pre-built tools to `/path/to/SNVCaller/` and unzip**
