@@ -17,7 +17,7 @@ This is a pipeline made to reliably generate calls for somatic mutations in Low 
 
 The general workflow in the pipeline is as follows: 
 
-`.BAM` and `.bed` files are copied to a temporary folder, where the processing happens. Ather that, the 4 tools will run in parralel, generating preliminary results which are also stored in the temporary folder. Since `VarDict` and `SiNVICT` don't output regular `.vcf` files, this data first needs to be processed in order to compare the overlapping variants in the `.vcf` files. This processing consists of sorting variants and generating `.vcf` files, which is done with custom Python and R scripts. Then, all `.vcf` files are [decomposed](https://genome.sph.umich.edu/wiki/Vt#Decompose), [normalized](https://genome.sph.umich.edu/wiki/Vt#Normalization), gunzipped and indexed. Finally, with all `.vcf` files processed, the variants can be compared on overlapping variants. All variants called with `x` or more tools will be saved. Also a venn diagram of mutation calls per tool is generated, together with histograms of amount of mutations with a certain VAF & Read Depth. VAF & Read Depth are calculated with the data from `VarDict`, `LoFreq`, `Mutect2`, since `SiNVICT` doensn't output this data. A folder contatining normal samples can be provided to generate a Panal of Normals (PoN) a.k.a. a blacklist. This can be used to filter out SNP's and/or technical artifacts (when the same library prep and sequencing methods are performed as in tumor samples). Finally, the remaining variants will be annotated using [openCRAVAT](https://opencravat.org/).
+`.BAM` and `.bed` files are copied to a temporary folder, where the processing happens. Ather that, the 4 tools will run in parralel, generating preliminary results which are also stored in the temporary folder. Since `VarDict` and `SiNVICT` don't output regular `.vcf` files, this data first needs to be processed in order to compare the overlapping variants in the `.vcf` files. This processing consists of sorting variants and generating `.vcf` files, which is done with custom Python and R scripts. Then, all `.vcf` files are [decomposed](https://genome.sph.umich.edu/wiki/Vt#Decompose), [normalized](https://genome.sph.umich.edu/wiki/Vt#Normalization), gunzipped and indexed. Finally, with all `.vcf` files processed, the variants can be compared on overlapping variants. All variants called with `x` or more tools will be saved. Also a venn diagram of mutation calls per tool is generated, together with histograms of amount of mutations with a certain VAF & Read Depth. VAF & Read Depth are calculated with the data from `VarDict`, `LoFreq`, `Mutect2`, since `SiNVICT` doensn't output this data. A folder contatining normal samples can be provided to generate a Panal of Normals (PoN) a.k.a. a blacklist. This can be used to filter out SNP's and/or technical artifacts (when the same library prep and sequencing methods are performed as in tumor samples). Finally, the remaining variants will be annotated using [openCRAVAT](https://opencravat.org/). Finally, all mutations (if provided blacklisted- and non blacklisted) are annotated using [OpenCravat](https://open-cravat.readthedocs.io/en/latest/quickstart.html). This is a wrapper around multiple well-known annotating tools, such as [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/), [dbSNP](https://www.ncbi.nlm.nih.gov/snp/), [COSMIC](https://cancer.sanger.ac.uk/cosmic), [gnomAD](https://gnomad.broadinstitute.org/) and many more. All annotated mutations are saved in an excel file. 
 
 *n.b. : A single `.bam` file or a directory containing `.bam` files can be given as arguments. When a directory is given, the process above will loop over all files, generating output folders for each `.bam` file* 
 
@@ -49,9 +49,9 @@ pip3 install glob
 pip install open-cravat
 oc module install-base
 oc module install clinvar
-oc module install civic_gene
-oc module install cgc
-oc module install cgl
+oc module install cosmic
+oc module install ...  (see https://open-cravat.readthedocs.io/en/latest/1.-Installation-Instructions.html for more detailed instructions)
+oc module ls -a -t annotator  (this generartes a list of available annotators that can be downloaded)
 deactivate
 ```
 **5. [Download](https://drive.google.com/drive/folders/1QBt0NdPqjQU_y-A7omxoyiPfl1DL65Xn?usp=sharing) and copy the pre-built tools to `/path/to/SNVCaller/` and unzip**
@@ -64,13 +64,13 @@ Once all tools and pre-requisites are installed correctly, the pipeline can be c
 `bash ./SNVcaller.sh ARGUMENTS`
 
 **Required** arguments:
-- `-I` Input:              **String**   --> example: `/path/to/input.bam`
+- `-I` Input:              **String**   --> example: `/path/to/input.bam` Either one-file or directory
 - `-R` Reference:          **String**    --> example: `/path/to/reference.fa`
 - `-L` Regions List:       **String**    --> example: `/path/to/panel.bed`
 - `-D` minimum Read Depth:  **Int**       --> example: `100`
 - `-V` minimum VAF:         __float *[0-1]*__  --> example: `0.002`
 - `-C` minimum Calls:       __Int *[1-4]*__ --> example: `2`
-- `-P` Panel of Normal:     **String** --> example: `/path/to/PoN/directory/`
+- `-P` Panel of Normal:     **String** --> example: `/path/to/PoN/directory/` Optional
 
 
 Output will be generated in `/path/to/SNVcaller/output/name_of_.bam_file/`
