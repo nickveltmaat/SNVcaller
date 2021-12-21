@@ -1,19 +1,18 @@
 """
 This module converts sorted sinvict output to standard .vcf format.
 Two arguments required to be given when calling this module:
-  #1: path to sorted sinvict file as input
+  #1: path to sorted bcftools isec or sinvict file as input
   #2: Path to location and name for newly generated .vcf file
 
-Author: Nick Veltmaat & Martijn Terpstra
-Date: 17-11-2021
+Author: Nick Veltmaat
+Date: 20-12-2021
 """
 
 import sys
 import subprocess
-if len(sys.argv) != 4:
-  print("Usage:\t" + sys.argv[0] + "\t<input_sinvict_file_path>\t<output_filename>\t<reference_fasta>")
+if len(sys.argv) != 5:
+  print("Usage:\t" + sys.argv[0] + "\t<input_sorted_bcftools_output_file>\t<output_filename>\t<reference_fasta>\t<input_type: 'sinvict' or 'bcftools_isec'>")
   exit(0)
-  
   
 outfile = open(sys.argv[2], "w")
 outfile.write("##fileformat=VCFv4.3\n")
@@ -30,7 +29,6 @@ chroms2 = set(chroms)
 for i in chroms2:
     outfile.write("##contig=<ID="+str(i)+">\n")
 
-
 outfile.write("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
 
 with open(sys.argv[1]) as infile:
@@ -39,8 +37,14 @@ with open(sys.argv[1]) as infile:
     tokens = line.split()
     chromosome = tokens[0]
     position = tokens[1]
-    ref = tokens[3]
-    alt = tokens[5]
+    if sys.argv[4] == 'bcftools_isec':
+      ref = tokens[2]
+      alt = tokens[3]
+    elif sys.argv[4] == 'sinvict':
+      ref = tokens[3]
+      alt = tokens[5]    
+    else: 
+      print("ERROR in providing correct input type. Choose between 'sinvict' or 'bcftools_isec'")
     if alt[0] == "+" :
       #insertion
       alt = ref + alt[1:]
