@@ -2,13 +2,18 @@
 This module automatically converts sorted vardict output to standard .vcf format.
 
 Author: Nick Veltmaat
-Date: 17-11-2021
+Date: 19-11-2021
 """
 
 import pandas as pd
 import glob
+import sys
 
-file = glob.glob('./temp/VD/vardict_output_sorted.vcf')
+if len(sys.argv) != 3:
+  print("Usage:\t" + sys.argv[0] + "\t<input_sorted_vardict_file_path>\t<output_path_filename>")
+  exit(0)
+
+file = glob.glob(str(sys.argv[1]))
 data = pd.read_csv(file[0], sep='\t', header=None)
 
 df = data.rename(columns={1: '#CHROM', 3: 'POS', 5:"REF", 6:"ALT"})
@@ -47,7 +52,7 @@ df = df.filter(['#CHROM', 'POS', 'REF', 'ALT', 'INFO'])
 df['ID'], df['QUAL'], df['FILTER'] = ['.', '.', '.']
 df = df[['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']]
 
-file1 = open("./temp/VD/VD.vcf","w",newline='')
+file1 = open(str(sys.argv[2]),"w",newline='')
 file1.write('''##fileformat=VCFv4.3\n''')
 file1.write('''##INFO=<ID=DP,Number=1,Type=Integer,Description="Depth, total Coverage">\n''')
 file1.write('''##INFO=<ID=ADP,Number=1,Type=Integer,Description="No. of reads supporting alternative allele">\n''')
