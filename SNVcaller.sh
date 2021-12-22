@@ -155,7 +155,7 @@ create_pon(){
   
   #annotating the PoN blacklist  
   source ./env/bin/activate
-  oc run ./PoN/BLAKCLIST.txt \
+  oc run ./PoN/BLACKLIST.txt \
     -l hg19 \
     -n annotated_blacklist --silent \
     -a clinvar civic cgc cgl cadd cancer_genome_interpreter cancer_hotspots chasmplus chasmplus_DLBC chasmplus_DLBC_mski \
