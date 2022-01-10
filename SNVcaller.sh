@@ -2,8 +2,8 @@
 # R sort scripts samenvoegen met argumenten
 # Sinvict to vcf. py Write loopjes in functie
 # Default values for parameters (if argument is given > overwrite..
-# Elke tool in een functie. input en bed als parameters
-# oc run in een functie
+# Filter Lofreq functie
+
 
 while getopts "R:L:I:O:V:D:C:P:" arg; do
   case $arg in
@@ -30,7 +30,6 @@ module load Python/3.9.1-GCCcore-7.3.0-bare
 module load R/4.0.3-foss-2018b-bare
 module list
 
-#rm -rf ./temp
 mkdir ./output
 
 postprocess_vcf() {
@@ -58,40 +57,87 @@ annotate() {
   deactivate 
 }
 
+mutect() { # $1 = sample, $2 = output, $3 = bed, $4 --max-mnp-distance 0 (PoN mode)
+  gatk Mutect2 \
+    --verbosity ERROR \
+    --callable-depth $RDP \
+    --minimum-allele-fraction $VAF \
+    -R $Reference \
+    -I $1 \
+    -O $2 \
+    --native-pair-hmm-threads 9 \
+    -L $3 --QUIET $4
+}
 
-create_pon(){
+filter_mutect() { # $1 = sample, $2 = output
+gatk FilterMutectCalls \
+  --verbosity ERROR \
+  --min-allele-fraction $VAF \
+  -R $Reference \
+  -V $1 \
+  -O $2
+}
+
+vardict() { # $1 = sample, $2 = output, $3 = bed
+  ~/.conda/pkgs/vardict-java-1.8.2-hdfd78af_3/bin/vardict-java \
+    -f $VAF \
+    -th 9 \
+    -G $Reference \
+    -b $1 \
+    -c 1 -S 2 -E 3 \
+    $3 > $2
+}
+
+lofreq() { # $1 = sample, $2 = output, $3 = bed
+  ./tools/lofreq/src/lofreq/lofreq call-parallel \
+     --pp-threads 9 \
+     --call-indels \
+     --no-default-filter \
+     -f $Reference \
+     -o $2 \
+     -l $3 \
+     $1
+}
+
+filter_lofreq() { # $1 = sample, $2 = output
+  ./tools/lofreq/src/lofreq/lofreq filter \
+    -i $1 \
+    -o $2 \
+    -v $RDP \
+    -a $VAF
+}
+
+sinvict() { # $1 = sample, $2 = output, $3 = bed, $4 temp_readcount
+./tools/sinvict/bam-readcount/build/bin/bam-readcount \
+  -l $3 \
+  -w 1 \
+  -f $Reference \
+  $1 > $4/output.readcount && \
+    
+./tools/sinvict/sinvict \
+  -m $RDP \
+  -f $VAF \
+  -t $4 \
+  -o $2
+}
+
+
+create_pon() {
   echo -e "\nPoN included: source for PoN .bam files = $PoN"
-  echo -e 'Generating PoN from normal samples: \n\n'
   #Step 1; Tumor only mode on all normal bam files
   for entry in "$PoN"/*.bam
   do
     echo -e '\n\nGenerating VCF for normal control: '
-    echo normalcontrol= $(basename $entry .bam)
-    #Mutect
-    gatk Mutect2 --verbosity ERROR -R $Reference -I $entry \
-      --max-mnp-distance 0 -O ./PoN/normal_$(basename $entry .bam)_Mutect.vcf.gz \
-      --callable-depth $RDP \
-      --minimum-allele-fraction $VAF \
-      --native-pair-hmm-threads 9 -L ./PoN/newbed.bed --QUIET &
+    echo -e normalcontrol= $(basename $entry .bam) '\n'
+    #Mutect2
+    mutect $entry ./PoN/normal_$(basename $entry .bam)_Mutect.vcf.gz ./PoN/newbed.bed "--max-mnp-distance 0" & \
+    
     #Vardict
-    ~/.conda/pkgs/vardict-java-1.8.2-hdfd78af_3/bin/vardict-java \
-      -f $VAF \
-      -th 8 \
-      -G $Reference \
-      -b $entry \
-      -c 1 -S 2 -E 3 \
-      ./PoN/newbed.bed > ./PoN/normal_$(basename $entry .bam)_Vardict1.vcf &   
+    vardict $entry ./PoN/normal_$(basename $entry .bam)_Vardict1.vcf ./PoN/newbed.bed & \
+
     #Lofreq
-    ./tools/lofreq/src/lofreq/lofreq call-parallel \
-       --pp-threads 8 \
-       --call-indels \
-       --no-default-filter \
-       -f $Reference \
-       -o ./PoN/normal_$(basename $entry .bam)_LofreqUnfiltered.vcf \
-       -l ./PoN/newbed.bed \
-       $entry &&
-       
-      #Filter Lofreq     
+    lofreq $entry ./PoN/normal_$(basename $entry .bam)_LofreqUnfiltered.vcf ./PoN/newbed.bed && \
+    #Filter Lofreq     
     ./tools/lofreq/src/lofreq/lofreq filter \
       -i ./PoN/normal_$(basename $entry .bam)_LofreqUnfiltered.vcf \
       -o ./PoN/normal_$(basename $entry .bam)_Lofreq.vcf  \
@@ -100,19 +146,8 @@ create_pon(){
        
     #SiNVICT
     mkdir ./PoN/$(basename $entry .bam)output-readcount/ && mkdir ./PoN/$(basename $entry .bam)output-sinvict/ && \
-    ./tools/sinvict/bam-readcount/build/bin/bam-readcount \
-      -l ./PoN/newbed.bed \
-      -w 1 \
-      -f $Reference \
-      $entry > ./PoN/$(basename $entry .bam)output-readcount/output.readcount && \
-    
-    ./tools/sinvict/sinvict \
-      -m $RDP \
-      -f $VAF \
-      -t ./PoN/$(basename $entry .bam)output-readcount/ \
-      -o ./PoN/$(basename $entry .bam)output-sinvict/ && \
-    
-    rm -rf ./PoN/$(basename $entry .bam)output-readcount/
+    sinvict $entry ./PoN/$(basename $entry .bam)output-sinvict/ ./PoN/newbed.bed  ./PoN/$(basename $entry .bam)output-readcount/ && \
+    rm -rf ./PoN/$(basename $entry .bam)output-readcount/ & \
     wait
     
     Rscript ./sort_vardict.R ./PoN/normal_$(basename $entry .bam)_Vardict1.vcf ./PoN/normal_$(basename $entry .bam)_Vardict2.vcf
@@ -141,7 +176,7 @@ create_pon(){
   xargs -a ./PoN/M2normals.dat gatk --java-options "-Xmx8g" GenomicsDBImport --verbosity ERROR --genomicsdb-workspace-path ./PoN/M2controls_pon_db_chr -R $Reference -L 1 -L 2 -L 3 -L 4 -L 5 -L 6 -L 7 -L 8 -L 9 -L 10 -L 11 -L 12 -L 13 -L 14 -L 15 -L 16 -L 17 -L 18 -L 19 -L 20 -L 21 -L 22 -L X -L Y --QUIET
 
   #Step 3 create merged PoN VCF file 
-  echo -e '\nGenerating Panel Of Normals VCF file: \n\n'
+  echo -e '\nGenerating Panel Of Normals VCF file: \n'
   gatk --java-options "-Xmx8g" CreateSomaticPanelOfNormals \
     --verbosity ERROR -R $Reference \
     --QUIET \
@@ -161,12 +196,12 @@ create_pon(){
   postprocess_vcf "./PoN/merged_PoN_Sinvict.vcf"
   postprocess_vcf "./PoN/merged_PoN_Mutect2.vcf"
   
-  
   bcftools isec -o ./PoN/BLACKLIST.txt -O v -n +2 ./PoN/merged_PoN_Sinvict-decomposed-normalized.vcf.gz ./PoN/merged_PoN_Mutect2-decomposed-normalized.vcf.gz ./PoN/merged_PoN_Lofreq-decomposed-normalized.vcf.gz ./PoN/merged_PoN_Vardict-decomposed-normalized.vcf.gz
-  #rm -rf ./PoN/normal* && rm -rf ./PoN/*.dat && rm -rf ./PoN/merged_*.*
-  
+
   #annotating the PoN blacklist  
+  echo -e '\n Annotating PoN Blacklist...\n'
   annotate "./PoN/BLACKLIST.txt" "annotated_blacklist"
+  echo -e '\nDone! PoN is ready for use. Now on to analyzing samples...\n\n'
 }
 
 
@@ -184,91 +219,51 @@ run_tools() {
   ############# TOOLS: 
   echo -e '\nRunning all 4 tools simultaneously...\n'
   #Lofreq
-  ./tools/lofreq/src/lofreq/lofreq call-parallel \
-     --pp-threads 8 \
-     --call-indels \
-     --no-default-filter \
-     -f $Reference \
-     -o ./temp/LF/output_lofreq_bed.vcf \
-     -l ./temp/newbed.bed \
-     ./temp/newbam.bam && \
-  #Filter Lofreq     
-  ./tools/lofreq/src/lofreq/lofreq filter \
-      -i ./temp/LF/output_lofreq_bed.vcf \
-      -o ./temp/LF/LF.vcf \
-      -v $RDP \
-      -a $VAF & \
+  lofreq ./temp/newbam.bam ./temp/LF/output_lofreq_bed.vcf ./temp/newbed.bed && \
+  #Filter Lofreq
+  filter_lofreq ./temp/LF/output_lofreq_bed.vcf ./temp/LF/LF.vcf & \
       
   #Mutect2
-  gatk Mutect2 \
-    --verbosity ERROR \
-    --callable-depth $RDP \
-    --minimum-allele-fraction $VAF \
-    -R $Reference \
-    -I ./temp/newbam.bam \
-    -O ./temp/M2/M2Unfiltered.vcf \
-    --native-pair-hmm-threads 8 \
-    -L ./temp/newbed.bed && \
-  #Filter Mutect2    
-  gatk FilterMutectCalls \
-    --verbosity ERROR \
-    --min-allele-fraction $VAF \
-    -R $Reference \
-    -V ./temp/M2/M2Unfiltered.vcf \
-    -O ./temp/M2/M2.vcf & \
+  mutect ./temp/newbam.bam ./temp/M2/M2Unfiltered.vcf ./temp/newbed.bed && \
+  #Filter Mutect2
+  filter_mutect ./temp/M2/M2Unfiltered.vcf ./temp/M2/M2.vcf & \
     
   #VarDict
-  ~/.conda/pkgs/vardict-java-1.8.2-hdfd78af_3/bin/vardict-java \
-    -f $VAF \
-    -th 8 \
-    -G $Reference \
-    -b ./temp/newbam.bam \
-    -c 1 -S 2 -E 3 \
-    ./temp/newbed.bed > ./temp/VD/vardict_raw.vcf & \
+  vardict ./temp/newbam.bam ./temp/VD/vardict_raw.vcf ./temp/newbed.bed & \
     
   #SiNVICT
-  ./tools/sinvict/bam-readcount/build/bin/bam-readcount \
-    -l ./temp/newbed.bed \
-    -w 1 \
-    -f $Reference \
-    ./temp/newbam.bam > ./temp/output-readcount/output.readcount && \
-    
-    ./tools/sinvict/sinvict \
-    -m $RDP \
-    -f $VAF \
-    -t ./temp/output-readcount/ \
-    -o ./temp/output-sinvict/ & \
+  sinvict ./temp/newbam.bam ./temp/output-sinvict/ ./temp/newbed.bed ./temp/output-readcount/ & \
   wait
   
   ## Processing LoFreq:
-  echo -e '\n\n\nProcessing LoFreq data: \n\n'
+  echo -e '\n\Processing LoFreq data: \n'
   postprocess_vcf "./temp/LF/LF.vcf"
   
   ## Processing Mutect2:
-  echo -e '\n\n\nProcessing Mutect2: \n\n'
+  echo -e '\nProcessing Mutect2: \n'
   postprocess_vcf "./temp/M2/M2.vcf"
   
   ## Processing VarDict
-  echo -e '\n\n\nProcessing Vardict data: \n\n'
+  echo -e '\nProcessing Vardict data: \n'
   Rscript ./sort_vardict.R ./temp/VD/vardict_raw.vcf ./temp/VD/vardict_output_sorted.vcf
   pythonscript ./vardict_vcf.py ./temp/VD/vardict_output_sorted.vcf ./temp/VD/VD.vcf
   postprocess_vcf "./temp/VD/VD.vcf"
   
   ## Processing SiNVICT
-  echo -e '\n\n\nProcessing SiNVICT data: \n\n'
+  echo -e '\nProcessing SiNVICT data: \n'
   Rscript ./sort_sinvict.R ./temp/output-sinvict/calls_level1.sinvict ./temp/output-sinvict/calls_level1_sorted.sinvict
   pythonscript ./create_vcf.py ./temp/output-sinvict/calls_level1_sorted.sinvict ./temp/SV/SV.vcf $Reference 'sinvict'
   postprocess_vcf "./temp/SV/SV.vcf"
 
   wait 
-  echo -e '\nData processed with all 4 tools\n\n'
+  echo -e '\nData processed with all 4 tools\n'
 }
 
 process_bam() {
   a=$1
   xbase=${a##*/}
   xpref=${xbase%.*}
-  echo -e "\nProcessing sample $xpref\n"  
+  echo -e "Processing sample $xpref\n"  
   run_tools $a
   mkdir ./output/${xpref} 
   echo -e '\nComparing SNV Tools: \n'
@@ -286,7 +281,7 @@ process_bam() {
   then
     echo ""
   else
-    echo -e "source for PoN .bam files = $PoN \n\nBlacklisting...\n"
+    echo -e "source for PoN .bam files = $PoN \nBlacklisting...\n"
     pythonscript ./pon_blacklist.py ${xpref}
     pythonscript ./create_plots.py ${xpref} "sites_PoN.txt"
 
@@ -306,11 +301,10 @@ process_bam() {
 # Create PoN if argument is given:
 if [ -z "$PoN" ]
 then
-  echo -e "No PoN mode\n\n"
+  echo -e "\nNo PoN mode\n"
 else
   mkdir ./PoN/
   sed 's/chr//g' $Listregions > ./PoN/newbed.bed
-  #bash ./Create_PoN.sh "$@"
   create_pon
 fi
 
