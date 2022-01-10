@@ -47,6 +47,18 @@ pythonscript() {
   deactivate
 }
 
+annotate() {
+  source ./env/bin/activate
+  oc run $1 \
+    -l hg19 \
+    -n $2 --silent \
+    -a clinvar civic cgc cgl cadd cancer_genome_interpreter cancer_hotspots chasmplus chasmplus_DLBC chasmplus_DLBC_mski \
+       clinpred cosmic cscape dbsnp gnomad mutation_assessor thousandgenomes vest cadd_exome gnomad3 thousandgenomes_european \
+    -t excel
+  deactivate 
+}
+
+
 create_pon(){
   echo -e "\nPoN included: source for PoN .bam files = $PoN"
   echo -e 'Generating PoN from normal samples: \n\n'
@@ -154,14 +166,7 @@ create_pon(){
   #rm -rf ./PoN/normal* && rm -rf ./PoN/*.dat && rm -rf ./PoN/merged_*.*
   
   #annotating the PoN blacklist  
-  source ./env/bin/activate
-  oc run ./PoN/BLACKLIST.txt \
-    -l hg19 \
-    -n annotated_blacklist --silent \
-    -a clinvar civic cgc cgl cadd cancer_genome_interpreter cancer_hotspots chasmplus chasmplus_DLBC chasmplus_DLBC_mski \
-       clinpred cosmic cscape dbsnp gnomad mutation_assessor thousandgenomes vest cadd_exome gnomad3 thousandgenomes_european \
-    -t excel 
-  deactivate
+  annotate "./PoN/BLACKLIST.txt" "annotated_blacklist"
 }
 
 
@@ -284,29 +289,15 @@ process_bam() {
     echo -e "source for PoN .bam files = $PoN \n\nBlacklisting...\n"
     pythonscript ./pon_blacklist.py ${xpref}
     pythonscript ./create_plots.py ${xpref} "sites_PoN.txt"
-    source ./env/bin/activate
-    
+
     echo 'annotating variants filterd by pon...' 
-    oc run ./output/${xpref}/sites_PoN.txt \
-      -l hg19 \
-      -n annotated_SNVs_PoN_blacklisted --silent \
-      -a clinvar civic cgc cgl cadd cancer_genome_interpreter cancer_hotspots chasmplus chasmplus_DLBC chasmplus_DLBC_mski \
-         clinpred cosmic cscape dbsnp gnomad mutation_assessor thousandgenomes vest cadd_exome gnomad3 thousandgenomes_european \
-      -t excel
-    deactivate 
+    annotate "./output/${xpref}/sites_PoN.txt" "annotated_SNVs_PoN_blacklisted"
   fi 
   
   #Plotting and Annotating SNV's   
   pythonscript ./create_plots.py ${xpref} "sites.txt"
   echo 'annotating variants...'
-  source ./env/bin/activate
-  oc run ./output/${xpref}/sites.txt \
-    -l hg19 \
-    -n annotated_SNVs --silent \
-    -a clinvar civic cgc cgl cadd cancer_genome_interpreter cancer_hotspots chasmplus chasmplus_DLBC chasmplus_DLBC_mski \
-       clinpred cosmic cscape dbsnp gnomad mutation_assessor thousandgenomes vest cadd_exome gnomad3 thousandgenomes_european \
-    -t excel
-  deactivate 
+  annotate "./output/${xpref}/sites.txt" "annotated_SNVs"
   
   rm -rf ./temp  
   echo -e "\nAnalysis of $xpref is complete!\n\n\n"
