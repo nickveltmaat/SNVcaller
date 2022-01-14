@@ -1,6 +1,8 @@
 # SNVcaller
 #### **Pipeline to call SNV's with 4 tools ([`VarDict`](https://pubmed.ncbi.nlm.nih.gov/27060149/), [`LoFreq`](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3526318/), [`Mutect2`](https://www.biorxiv.org/content/10.1101/861054v1) & [`SiNVICT`](https://pubmed.ncbi.nlm.nih.gov/27531099/))**
 
+DISCLAIMER: This project is under construction and valid results are therefore not guaranteed
+
 ### Prerequisites:
  * A process-ready BAM file (or folder containing them), e.g. pre-processed following [GATK best practices](https://gatk.broadinstitute.org/hc/en-us/articles/360035535912-Data-pre-processing-for-variant-discovery)
  * [GATK](https://gatk.broadinstitute.org/hc/en-us) > [4.1.4.1](https://github.com/broadinstitute/gatk/releases/tag/4.1.4.1)
