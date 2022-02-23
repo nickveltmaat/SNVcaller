@@ -47,8 +47,7 @@ pip3 install pandas
 pip3 install venn
 pip3 install matplotlib
 pip3 install pandas_bokeh
-pip3 install glob
-pip install open-cravat
+pip3 install open-cravat
 oc module install-base
 oc module ls -a -t annotator  (this generartes a list of available annotators that can be downloaded)
 oc module install clinvar cosmic dbsnp ...  (see https://open-cravat.readthedocs.io/en/latest/1.-Installation-Instructions.html for more detailed instructions)
