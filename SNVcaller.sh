@@ -1,11 +1,25 @@
+#!/bin/bash
+#SBATCH --job-name=SNVcaller_1_1
+#SBATCH --output="SNVtest.out"
+#SBATCH --error="SNVtest.err"
+#SBATCH --time=16:00:00
+#SBATCH --mem=10gb
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=10
+#SBATCH --get-user-env=L60
+#SBATCH --export=NONE
+
 #TODO:
 # R sort scripts samenvoegen met argumenten
 # Sinvict to vcf. py Write loopjes in functie
 # Default values for parameters (if argument is given > overwrite..
 # Filter Lofreq functie
+# Add number of CPU argument (X ofzo)
+# BaseQ , StrandBias toevoegen
 
 
-while getopts "R:L:I:O:V:D:C:P:" arg; do
+
+while getopts "R:L:I:O:V:D:C:P:Q:B:" arg; do
   case $arg in
     R) Reference=$OPTARG;;      # "/apps/data/1000G/phase1/human_g1k_v37_phiX.fasta"
     L) Listregions=$OPTARG;;    # "/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/2020_covered_probe_notranslocation.bed"
@@ -15,6 +29,8 @@ while getopts "R:L:I:O:V:D:C:P:" arg; do
     D) RDP=$OPTARG;;            # 100
     C) Calls=$OPTARG;;          # 1
     P) PoN=$OPTARG;;            # "/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/GenomeScan_SequenceData/104103_normals/"
+    Q) Qual=$OPTARG;;           # BaseQuality (18)
+    B) Bias=$OPTARG;;           # Strand Bias (5-95)
   esac
 done
 
@@ -62,6 +78,7 @@ mutect() { # $1 = sample, $2 = output, $3 = bed, $4 --max-mnp-distance 0 (PoN mo
     --verbosity ERROR \
     --callable-depth $RDP \
     --minimum-allele-fraction $VAF \
+    --min-base-quality-score $Qual \
     -R $Reference \
     -I $1 \
     -O $2 \
@@ -84,6 +101,7 @@ vardict() { # $1 = sample, $2 = output, $3 = bed
     -th 9 \
     -G $Reference \
     -b $1 \
+    -q $Qual \
     -c 1 -S 2 -E 3 \
     $3 > $2
 }
@@ -95,7 +113,7 @@ lofreq() { # $1 = sample, $2 = output, $3 = bed
      --no-default-filter \
      -f $Reference \
      -o $2 \
-     -l $3 \
+     -l $3 -q $Qual -Q $Qual \
      $1
 }
 
@@ -111,6 +129,7 @@ sinvict() { # $1 = sample, $2 = output, $3 = bed, $4 temp_readcount
 ./tools/sinvict/bam-readcount/build/bin/bam-readcount \
   -l $3 \
   -w 1 \
+  -b $Qual \
   -f $Reference \
   $1 > $4/output.readcount && \
     
@@ -181,11 +200,11 @@ create_pon() {
     --verbosity ERROR -R $Reference \
     --QUIET \
     -V gendb://$PWD/PoN/M2controls_pon_db_chr \
-    -O ./PoN/merged_PoN_Mutect2.vcf
+    -O ./PoN/merged_PoN_Mutect2.vcf --min-sample-count 1 ###CHANGED (n samples)
   
-  xargs -a ./PoN/VDnormals.dat bcftools isec -o ./PoN/Xmerged_PoN_Vardict.vcf -O v -n +2 
-  xargs -a ./PoN/LFnormals.dat bcftools isec -o ./PoN/Xmerged_PoN_Lofreq.vcf -O v -n +2 
-  xargs -a ./PoN/SVnormals.dat bcftools isec -o ./PoN/Xmerged_PoN_Sinvict.vcf -O v -n +2 
+  xargs -a ./PoN/VDnormals.dat bcftools isec -o ./PoN/Xmerged_PoN_Vardict.vcf -O v -n +1 #CHANGED(n samples)
+  xargs -a ./PoN/LFnormals.dat bcftools isec -o ./PoN/Xmerged_PoN_Lofreq.vcf -O v -n +1  #CHANGED(n samples)
+  xargs -a ./PoN/SVnormals.dat bcftools isec -o ./PoN/Xmerged_PoN_Sinvict.vcf -O v -n +1 #CHANGED(n samples)
   echo -e '\ndecomposing and normalizing PoN VCF file: \n\n' 
 
   pythonscript ./create_vcf.py ./PoN/Xmerged_PoN_Vardict.vcf ./PoN/merged_PoN_Vardict.vcf $Reference 'bcftools_isec'
@@ -196,7 +215,7 @@ create_pon() {
   postprocess_vcf "./PoN/merged_PoN_Sinvict.vcf"
   postprocess_vcf "./PoN/merged_PoN_Mutect2.vcf"
   
-  bcftools isec -o ./PoN/BLACKLIST.txt -O v -n +2 ./PoN/merged_PoN_Sinvict-decomposed-normalized.vcf.gz ./PoN/merged_PoN_Mutect2-decomposed-normalized.vcf.gz ./PoN/merged_PoN_Lofreq-decomposed-normalized.vcf.gz ./PoN/merged_PoN_Vardict-decomposed-normalized.vcf.gz
+  bcftools isec -o ./PoN/BLACKLIST.txt -O v -n +1 ./PoN/merged_PoN_Sinvict-decomposed-normalized.vcf.gz ./PoN/merged_PoN_Mutect2-decomposed-normalized.vcf.gz ./PoN/merged_PoN_Lofreq-decomposed-normalized.vcf.gz ./PoN/merged_PoN_Vardict-decomposed-normalized.vcf.gz  #CHANGED(n tools)
 
   #annotating the PoN blacklist  
   echo -e '\n Annotating PoN Blacklist...\n'
@@ -259,6 +278,7 @@ run_tools() {
   echo -e '\nData processed with all 4 tools\n'
 }
 
+##RUN SAMPLE
 process_bam() {
   a=$1
   xbase=${a##*/}
@@ -283,44 +303,66 @@ process_bam() {
   else
     echo -e "source for PoN .bam files = $PoN \nBlacklisting...\n"
     pythonscript ./pon_blacklist.py ${xpref}
-    pythonscript ./create_plots.py ${xpref} "sites_PoN.txt"
+    pythonscript ./create_plots.py ${xpref} "sites_PoN.txt" $RDP
 
     echo 'annotating variants filterd by pon...' 
-    annotate "./output/${xpref}/sites_PoN.txt" "annotated_SNVs_PoN_blacklisted"
+    annotate ./output/${xpref}/vcfs_merged_PoN.txt "annotated_SNVs_PoN_blacklisted"
   fi 
   
   #Plotting and Annotating SNV's   
-  pythonscript ./create_plots.py ${xpref} "sites.txt"
+  pythonscript ./create_plots.py ${xpref} "sites.txt" $RDP
   echo 'annotating variants...'
-  annotate "./output/${xpref}/sites.txt" "annotated_SNVs"
+  annotate ./output/${xpref}/vcfs_merged.txt "annotated_SNVs"
   
-  rm -rf ./temp  
+  #rm -rf ./temp  
   echo -e "\nAnalysis of $xpref is complete!\n\n\n"
 }
 
+
+## PON INITIATION:
 # Create PoN if argument is given:
 if [ -z "$PoN" ]
 then
-  echo -e "\nNo PoN mode\n"
+  #No PoN Argument
+  echo -e "\nNo PoN argument given\n"
 else
+  # If PoN Argument is given:
+  echo -e "\nPoN argument is given!!\n"
   mkdir ./PoN/
-  sed 's/chr//g' $Listregions > ./PoN/newbed.bed
-  create_pon
+  
+  #Directory PoN:
+  if [[ -d $PoN ]]; then
+    echo 'PoN is directory'
+    sed 's/chr//g' $Listregions > ./PoN/newbed.bed
+    create_pon
+    
+  #One-File: a.k.a pre-made blacklist:      
+  elif [[ -f $PoN ]]; then
+    echo -e "PoN is given as pre-made blacklist: \n$PoN \n"
+    cp $PoN ./PoN/BLACKLIST.txt
+  
+  #Else (error)
+  else
+    echo "Invalid PoN input. Input folder with .bam files or PoN.txt "
+    exit 1
+  fi
 fi
 
+
+## RUNNING SAMPLES FROM DIRECTORY OR SINGLE MODE
 #Directory:
 if [[ -d $Inputbam ]]; then
-    for entry in "$Inputbam"/*.bam
-    do
-      process_bam $entry
-    done  
+  for entry in "$Inputbam"/*.bam
+  do
+    process_bam $entry
+  done  
 #One-File:     
 elif [[ -f $Inputbam ]]; then
-    process_bam $Inputbam
+  process_bam $Inputbam
 #Else (error)
 else
-    echo "$Inputbam is not valid"
-    exit 1
+  echo "$Inputbam is not valid"
+  exit 1
 fi
 
 echo -e '\nFinished run! \n'
