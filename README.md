@@ -48,6 +48,7 @@ pip3 install venn
 pip3 install matplotlib
 pip3 install pandas_bokeh
 pip3 install glob
+pip3 install xlrd
 pip install open-cravat
 oc module install-base
 oc module ls -a -t annotator  (this generartes a list of available annotators that can be downloaded)
