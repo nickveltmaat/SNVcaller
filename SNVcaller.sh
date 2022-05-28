@@ -2,7 +2,7 @@
 #SBATCH --job-name=SNVcaller_1_1
 #SBATCH --output="SNVtest.out"
 #SBATCH --error="SNVtest.err"
-#SBATCH --time=16:00:00
+#SBATCH --time=15:00:00
 #SBATCH --mem=10gb
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=10
@@ -15,8 +15,11 @@
 # Default values for parameters (if argument is given > overwrite..
 # Filter Lofreq functie
 # Add number of CPU argument (X ofzo)
-# BaseQ , StrandBias toevoegen
+# StrandBias toevoegen
 
+
+#Create_plots.py hernoemen naar merge_sites_with_raw_callerdata.py: Deze maakt merged_vcfs_PoN.txt (of merged_vcfs.txt)
+#nieuwe plotting.py script maken die als input sites.txt of filtered_variants.xlsx kan pakken. Alle plots achteraf dus
 
 
 while getopts "R:L:I:O:V:D:C:P:Q:B:" arg; do
@@ -67,7 +70,7 @@ annotate() {
   oc run $1 \
     -l hg19 \
     -n $2 --silent \
-    -a clinvar civic cgc cgl cadd cancer_genome_interpreter cancer_hotspots chasmplus chasmplus_DLBC chasmplus_DLBC_mski \
+    -a clinvar civic cgc cgl cadd cancer_genome_interpreter cancer_hotspots chasmplus \
        clinpred cosmic cscape dbsnp gnomad mutation_assessor thousandgenomes vest cadd_exome gnomad3 thousandgenomes_european \
     -t excel
   deactivate 
@@ -301,20 +304,40 @@ process_bam() {
   then
     echo ""
   else
-    echo -e "source for PoN .bam files = $PoN \nBlacklisting...\n"
+    echo -e "source for PoN .bam files = $PoN \nBlacklisting..."
     pythonscript ./pon_blacklist.py ${xpref}
-    pythonscript ./create_plots.py ${xpref} "sites_PoN.txt" $RDP
-
+    
+    #Filtering, Plotting and Annotating SNV's 
+    echo 'Merging variants stats & M2 & VD filtering steps...'  
+    pythonscript ./merge_and_filter.py ${xpref} "sites_PoN.txt" $RDP
     echo 'annotating variants filterd by pon...' 
     annotate ./output/${xpref}/vcfs_merged_PoN.txt "annotated_SNVs_PoN_blacklisted"
+    echo 'post-filtering variants filterd by pon...' 
+    pythonscript ./post_filtering.py ${xpref} "annotated_SNVs_PoN_blacklisted.xlsx"
+    echo 'plotting variants filterd by pon...'
+    pythonscript ./plotting.py ${xpref} "filtered_variants_PoN.xlsx"
   fi 
   
-  #Plotting and Annotating SNV's   
-  pythonscript ./create_plots.py ${xpref} "sites.txt" $RDP
+  #Plotting and Annotating SNV's
+  echo 'Merging variants stats & M2 & VD filtering steps...'   
+  pythonscript ./merge_and_filter.py ${xpref} "sites.txt" $RDP
   echo 'annotating variants...'
   annotate ./output/${xpref}/vcfs_merged.txt "annotated_SNVs"
+  echo 'post-filtering variants...'
+  pythonscript ./post_filtering.py ${xpref} "annotated_SNVs.xlsx"
+  echo 'plotting variants...'
+  pythonscript ./plotting.py ${xpref} "filtered_variants.xlsx"
   
-  #rm -rf ./temp  
+  #Cleaning
+  mkdir ./output/${xpref}/annotations
+  mv ./output/${xpref}/anno*.* ./output/${xpref}/annotations
+  mkdir ./output/${xpref}/plots
+  mv ./output/${xpref}/*.html ./output/${xpref}/plots
+  mv ./output/${xpref}/*.png ./output/${xpref}/plots
+  mkdir ./output/${xpref}/intermediate_files
+  mv ./output/${xpref}/*.txt ./output/${xpref}/intermediate_files
+  
+  rm -rf ./temp  
   echo -e "\nAnalysis of $xpref is complete!\n\n\n"
 }
 
