@@ -5,6 +5,7 @@ import io
 import os
 import re
 
+
 sample = sys.argv[1]
 data = sys.argv[2]
 path = './output/'
@@ -22,12 +23,33 @@ else:
 annotated['vaf'] = annotated['Samples'].str.split('AF:', 1).str[1].str.split('_DP', 1).str[0].astype(float)
 annotated['dp'] = annotated['Samples'].str.split('DP:', 1).str[1].str.split(';', 1).str[0].astype(int)
 annotated['mut_dp'] = (annotated['vaf'] * annotated['dp']).round().astype(int)
-annotated = annotated[annotated['mut_dp'] >= 2] #Filter out variants with 2 mutant read
+annotated = annotated[annotated['mut_dp'] >= 2] #Filter out variants with 1 mutant read
 dffilter.loc[len(dffilter)] = ['<2_mut_reads', len(annotated)]
-annotated = annotated[annotated['mut_dp'] >= 3] #Filter out variants with 1 mutant read
+annotated = annotated[annotated['mut_dp'] >= 3] #Filter out variants with 2 mutant reads
 dffilter.loc[len(dffilter)] = ['<3_mut_reads', len(annotated)]
+
 #drop created new colums
 annotated = annotated.drop(['vaf', 'dp', 'mut_dp'], axis = 1)
+
+#annotated['AF'] = annotated['AF'].fillna(0)
+#annotated = annotated[annotated['AF'] < 0.01] #Filter 1000G
+#annotated['AF'] = annotated['AF'].replace(0, 'NaN', inplace=True)
+#dffilter.loc[len(dffilter)] = ['>1%_1000G', len(annotated)]
+
+#annotated['EUR AF'] = annotated['EUR AF'].fillna(0)
+#annotated = annotated[annotated['EUR AF'] < 0.01] #Filter 1000G
+#annotated['EUR AF'] = annotated['EUR AF'].replace(0, 'NaN', inplace=True)
+#dffilter.loc[len(dffilter)] = ['>1%_1000G_EUR', len(annotated)]
+
+#annotated['Global AF'] = annotated['Global AF'].fillna(0)
+#annotated = annotated[annotated['Global AF'] < 0.01] #Filter GnoMAD
+#annotated['Global AF'] = annotated['Global AF'].replace(0, 'NaN', inplace=True)
+#dffilter.loc[len(dffilter)] = ['>1%_GnomAD', len(annotated)]
+
+#annotated['Non-Fin Eur AF'] = annotated['Non-Fin Eur AF'].fillna(0)
+#annotated = annotated[annotated['Non-Fin Eur AF'] < 0.01] #Filter GnoMAD
+#annotated['Non-Fin Eur AF'] = annotated['Non-Fin Eur AF'].replace(0, 'NaN', inplace=True)
+#dffilter.loc[len(dffilter)] = ['>1%_GnomAD_EUR', len(annotated)]
 
 annotated = annotated[annotated['Sequence Ontology'] != 'synonymous_variant'] #Filter synonymous
 dffilter.loc[len(dffilter)] = ['Synonymous', len(annotated)]
