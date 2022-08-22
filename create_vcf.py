@@ -31,7 +31,8 @@ if sys.argv[4] == 'bcftools_isec':
   pass
 elif sys.argv[4] == 'sinvict':
   outfile.write('''##FORMAT=<ID=DP,Number=1,Type=String,Description="Read Depth">\n''')
-  outfile.write('''##FORMAT=<ID=VF,Number=1,Type=String,Description="Variant Allele Frequency">\n''')
+  outfile.write('''##FORMAT=<ID=VAF,Number=1,Type=String,Description="Variant Allele Frequency">\n''')
+  outfile.write('''##FORMAT=<ID=MDP,Number=1,Type=String,Description="Number of reads supporting the mutation">\n''')
 
 chroms2 = set(chroms)    
 for i in chroms2:
@@ -53,6 +54,7 @@ with open(sys.argv[1]) as infile:
       alt = tokens[5]
       vaf = round(float(tokens[7])/100, 3)
       depth = int(tokens[4])
+      mutdp = int(tokens[6])
     else: 
       print("ERROR in providing correct input type. Choose between 'sinvict' or 'bcftools_isec'")
     if alt[0] == "+" :
@@ -63,7 +65,7 @@ with open(sys.argv[1]) as infile:
                       + "\t" + "." + "\t" + "PASS" + "\t" + "." + "\t" + "." + "\t" +'.' + "\n")
       elif sys.argv[4] == 'sinvict':
         outfile.write(chromosome + "\t" + str(position) + "\t" + "." + "\t" + ref.upper() + "\t" + alt.upper() 
-                      + "\t" + "." + "\t" + "PASS" + "\t" + "." + "\t" + "DP:VF" + "\t" + str(depth)+':'+str(vaf) + "\n")
+                      + "\t" + "." + "\t" + "PASS" + "\t" + "." + "\t" + "DP:VAF:MDP" + "\t" + str(depth)+':'+str(vaf)+':'+str(mutdp)  + "\n")
     elif alt[0] == "-" :
       #deletion
       position = int(position)
@@ -78,13 +80,13 @@ with open(sys.argv[1]) as infile:
                       + "\t" + "." + "\t" + "PASS"  + "\t" + "." + "\t" + "." + "\t" + '.' + "\n")
       elif sys.argv[4] == 'sinvict':
         outfile.write(chromosome + "\t" + str(position) + "\t" + "." + "\t" + ref.decode("utf-8").upper() + "\t" + alt.decode("utf-8").upper() 
-                      + "\t" + "." + "\t" + "PASS"  + "\t" + "." + "\t" + "DP:VF" + "\t" + str(depth)+':'+str(vaf) + "\n")
+                      + "\t" + "." + "\t" + "PASS"  + "\t" + "." + "\t" + "DP:VAF:MDP" + "\t" + str(depth)+':'+str(vaf)+':'+str(mutdp) + "\n")
     else:
       if sys.argv[4] == 'bcftools_isec':
         outfile.write(chromosome + "\t" + str(position) + "\t" + "." + "\t" + ref.upper() + "\t" + alt.upper() + 
         "\t" + "." + "\t" + "PASS"  + "\t" + "." + "\t" + "." + "\t" + '.' + "\n")
       elif sys.argv[4] == 'sinvict':
         outfile.write(chromosome + "\t" + str(position) + "\t" + "." + "\t" + ref.upper() + "\t" + alt.upper() + 
-        "\t" + "." + "\t" + "PASS"  + "\t" + "." + "\t" + "DP:VF" + "\t" + str(depth)+':'+str(vaf) + "\n")
+        "\t" + "." + "\t" + "PASS"  + "\t" + "." + "\t" + "DP:VAF:MDP" + "\t" + str(depth)+':'+str(vaf)+':'+str(mutdp) + "\n")
       
 # original copied and modified at 19okt2021 from: https://raw.githubusercontent.com/sfu-compbio/sinvict/master/sinvict_to_vcf.py
