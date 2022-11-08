@@ -2,7 +2,7 @@
 #SBATCH --job-name=SNVcaller_1_1
 #SBATCH --output="SNVtest.out"
 #SBATCH --error="SNVtest.err"
-#SBATCH --time=12:00:00
+#SBATCH --time=16:00:00
 #SBATCH --mem=10gb
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=10
@@ -21,9 +21,9 @@
 # Save list from P/LP filterd-out variants from PoN
 
 
-while getopts "R:L:I:O:V:D:C:P:Q:B:M:" arg; do
+while getopts "R:L:I:O:V:D:C:P:Q:B:M:" arg; do 
   case $arg in
-    R) Reference=$OPTARG;;      # "/apps/data/1000G/phase1/human_g1k_v37_phiX.fasta"
+    R) Reference=$OPTARG;;      # "/apps/data/1000G/phase1/human_g1k_v37_phiX.fasta" OR "/groups/umcg-pmb/tmp01/apps/data/reference_sequences/Homo_sapiens_assembly19_1000genomes_decoy.fasta"
     L) Listregions=$OPTARG;;    # "/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/2020_covered_probe_notranslocation.bed"
     I) Inputbam=$OPTARG;;       # "/groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/GenomeScan_SequenceData/103584/"
     O) Outputdir=$OPTARG;;
@@ -42,11 +42,14 @@ cd /groups/umcg-pmb/tmp01/projects/hematopathology/Lymphoma/Nick/SNVcallingPipel
 echo -e "\nSettings: \n\nInput bam(s): $Inputbam \nReference: $Reference \nPanel: $Listregions\nminimum VAF: $VAF\nminimum Read Depth: $RDP\nminimum overlapping calls: $Calls\nPoN:$PoN"
 echo -e '\nLoading modules: \n'
 module load GATK/4.1.4.1-Java-8-LTS
+module load libjpeg-turbo/2.0.2-GCCcore-7.3.0
+module load picard
 module load SAMtools/1.9-GCCcore-7.3.0
 module load BCFtools/1.11-GCCcore-7.3.0
 module load HTSlib/1.11-GCCcore-7.3.0
 #module load Python/3.9.1-GCCcore-7.3.0-bare
 module load R/4.0.3-foss-2018b-bare
+
 module list
 
 mkdir ./output
@@ -70,8 +73,8 @@ annotate() {
   oc run $1 \
     -l hg19 \
     -n $2 --silent \
-    -a clinvar civic cgc cgl cadd cancer_genome_interpreter cancer_hotspots chasmplus \
-       clinpred cosmic cscape dbsnp gnomad mutation_assessor thousandgenomes vest cadd_exome gnomad3 thousandgenomes_european \
+    -a clinvar cgc cadd chasmplus clinpred cosmic dbsnp mutation_assessor\
+        thousandgenomes thousandgenomes_european vest cadd_exome gnomad3  \
     -t excel
   deactivate 
 }
@@ -242,27 +245,37 @@ run_tools() {
   echo -e '\nPre-processing bam file... \n\n'
   ## Preprocessing .bam and (removing 'chr')
   sed 's/chr//g' $Listregions > ./temp/newbed.bed
-  samtools view -H $1 | sed 's/chr//g' > ./temp/header.sam
-  samtools reheader ./temp/header.sam $1 > ./temp/newbam.bam
-  samtools index ./temp/newbam.bam
+  
+  #samtools view -H $1 | sed 's/chr//g' > ./temp/header.sam
+  #samtools reheader ./temp/header.sam $1 > ./temp/newbam.bam
+  #cp $1 ./temp/newbam.bam
+  #samtools index ./temp/newbam.bam
+  samtools index $1
+  echo -e 'Collecting Alignment Metrics... \n'
+  java -jar ${EBROOTPICARD}/picard.jar CollectAlignmentSummaryMetrics QUIET=true VERBOSITY=ERROR \
+    R=$Reference \
+    I=./temp/newbam.bam \
+    O=./output/${xpref}/alignmentsummarymetrics.txt
+
 
   ############# TOOLS: 
-  echo -e '\nRunning all 4 tools simultaneously...\n'
+  echo -e '\n\n\nRunning all 4 tools simultaneously...\n'
+  
   #Lofreq
-  lofreq ./temp/newbam.bam ./temp/LF/output_lofreq_bed.vcf ./temp/newbed.bed && \
+  lofreq $1 ./temp/LF/output_lofreq_bed.vcf ./temp/newbed.bed && \
   #Filter Lofreq
   filter_lofreq ./temp/LF/output_lofreq_bed.vcf ./temp/LF/LF_1.vcf & \
       
   #Mutect2
-  mutect ./temp/newbam.bam ./temp/M2/M2Unfiltered.vcf ./temp/newbed.bed && \
+  mutect $1 ./temp/M2/M2Unfiltered.vcf ./temp/newbed.bed && \
   #Filter Mutect2
   filter_mutect ./temp/M2/M2Unfiltered.vcf ./temp/M2/M2_1.vcf & \
     
   #VarDict
-  vardict ./temp/newbam.bam ./temp/VD/vardict_raw.vcf ./temp/newbed.bed & \
+  vardict $1 ./temp/VD/vardict_raw.vcf ./temp/newbed.bed & \
     
   #SiNVICT
-  sinvict ./temp/newbam.bam ./temp/output-sinvict/ ./temp/newbed.bed ./temp/output-readcount/ & \
+  sinvict $1 ./temp/output-sinvict/ ./temp/newbed.bed ./temp/output-readcount/ & \
   wait
   
   ## Processing LoFreq:
@@ -298,9 +311,9 @@ process_bam() {
   a=$1
   xbase=${a##*/}
   xpref=${xbase%.*}
-  echo -e "Processing sample $xpref\n"  
-  run_tools $a
+  echo -e "Processing sample $xpref\n" 
   mkdir ./output/${xpref} 
+  run_tools $a
   echo -e '\nComparing SNV Tools: \n'
   bcftools isec \
     -p ./output/${xpref} \
@@ -348,7 +361,7 @@ process_bam() {
   mv ./output/${xpref}/*.txt ./output/${xpref}/intermediate_files
     
   rm -rf ./temp  
-  echo -e "\nAnalysis of $xpref is complete!\n"
+  echo -e "\nAnalysis of $xpref is complete!\n\n\n"
 }
 
 
