@@ -1,11 +1,9 @@
+from functionsmodule import *
+
 import pandas_bokeh
-import numpy as np
-import pandas as pd
 from venn import venn
 import matplotlib.pyplot as plt
-import sys
-import glob
-import math
+
 
 sample = sys.argv[1]
 data = sys.argv[2]
